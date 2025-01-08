@@ -113,8 +113,8 @@ jobs:
           # Install specific LLVM version
           choco install llvm --version=14.0.6 --force -y
           # Verify LLVM version and config
-          "C:\Program Files\LLVM\bin\llvm-config.exe" --version
-          echo "LLVM_CONFIG=C:\Program Files\LLVM\bin\llvm-config.exe" >> $GITHUB_ENV
+          & "C:\Program Files\LLVM\bin\llvm-config.exe" --version
+          echo "LLVM_CONFIG=C:\Program Files\LLVM\bin\llvm-config.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Build wheel
         run: python setup.py bdist_wheel
