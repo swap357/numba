@@ -127,6 +127,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install wheel setuptools twine numpy==${{ matrix.numpy }}
+          pip install llvmlite>=0.45.0
           ${{ matrix.tbb && 'pip install tbb==2021.6 tbb-devel==2021.6' || '' }}
           
       # Linux-specific setup
@@ -202,7 +203,7 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           twine check dist/*.whl
-          pip install llvmlite
+          pip install llvmlite>=0.45.0
           WHEEL=$(ls dist/*.whl)
           pip install --no-deps "$WHEEL"
           pip install numpy==${{ matrix.numpy }}
@@ -214,7 +215,7 @@ jobs:
         shell: pwsh
         run: |
           twine check dist/*.whl
-          pip install llvmlite
+          pip install llvmlite>=0.45.0
           $WHEEL = (Get-ChildItem dist/*.whl).Name
           pip install --no-deps "dist/$WHEEL"
           pip install numpy==${{ matrix.numpy }}
