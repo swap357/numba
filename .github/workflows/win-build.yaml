@@ -74,22 +74,30 @@ jobs:
 
     - name: Build Wheel
       run: |
+        # Initialize conda for PowerShell
+        conda init powershell
+        # Reload PowerShell profile to apply conda initialization
+        & $profile
+        # Activate and build in the same step
         conda activate build_env
+        # Show Python version to verify correct version
+        python --version
         python setup.py -q bdist_wheel
         Get-ChildItem dist
 
     - name: Create Test Environment
       run: |
-        conda create -n test_env `
-          python=${{ matrix.python }} `
-          numpy=${{ matrix.numpy }} `
-          "wheel>=0.32" `
-          twine
+        # Initialize conda for PowerShell
+        conda init powershell
+        & $profile
         conda activate test_env
         conda list
 
     - name: Test Wheel
       run: |
+        # Initialize conda for PowerShell
+        conda init powershell
+        & $profile
         conda activate test_env
         cd dist
         python -m pip install --extra-index https://pypi.anaconda.org/numba/label/wheels/simple (Get-Item *.whl).Name
