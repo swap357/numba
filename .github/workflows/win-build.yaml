@@ -67,7 +67,7 @@ jobs:
           
           # Install TBB if needed
           if [[ "${{ matrix.tbb }}" == "true" ]]; then
-            python -m pip install -y tbb==2021.6 tbb-devel==2021.6
+            python -m pip install tbb==2021.6 tbb-devel==2021.6
           fi
 
           # Install LLVM
