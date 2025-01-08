@@ -112,9 +112,13 @@ jobs:
           choco uninstall llvm -y
           # Install specific LLVM version
           choco install llvm --version=14.0.6 --force -y
-          # Verify LLVM version and config
-          & "C:\Program Files\LLVM\bin\llvm-config.exe" --version
-          echo "LLVM_CONFIG=C:\Program Files\LLVM\bin\llvm-config.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+          # Set LLVM path
+          echo "LLVM_CONFIG=C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_ENV -Append
+          # Verify LLVM installation
+          if (!(Test-Path "C:\Program Files\LLVM\bin")) {
+            Write-Error "LLVM installation not found"
+            exit 1
+          }
 
       - name: Build wheel
         run: python setup.py bdist_wheel
