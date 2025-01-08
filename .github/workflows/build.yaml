@@ -143,8 +143,9 @@ jobs:
       - name: Setup macOS build environment
         if: runner.os == 'macOS'
         run: |
-          brew install llvm@14 llvm-openmp
+          brew install llvm@14
           export LLVM_CONFIG=$(brew --prefix llvm@14)/bin/llvm-config
+          echo "LLVM_CONFIG=$(brew --prefix llvm@14)/bin/llvm-config" >> $GITHUB_ENV
 
       # Windows-specific setup
       - name: Setup Windows build environment
