@@ -76,33 +76,39 @@ jobs:
           echo "LLVM_CONFIG=C:\Program Files\LLVM\bin" >> $GITHUB_ENV
 
       - name: Build package
-        shell: bash
+        shell: pwsh
         run: |
-          export PATH="/c/Miniconda3:/c/Miniconda3/Scripts:/c/Miniconda3/Library/bin:$PATH"
-          eval "$(/c/Miniconda3/Scripts/conda.exe 'shell.bash' 'hook')"
+          $env:PATH = "C:\Miniconda3;C:\Miniconda3\Scripts;C:\Miniconda3\Library\bin;$env:PATH"
+          
+          # Initialize conda for PowerShell
+          & C:\Miniconda3\Scripts\conda.exe "shell.powershell" "hook" | Out-String | Invoke-Expression
+          
+          # Activate build environment
           conda activate build_env
           
           # Build using conda recipe
-          CONDA_BLD_PATH="$(pwd)/conda-bld"
-          mkdir -p $CONDA_BLD_PATH
+          $CONDA_BLD_PATH = Join-Path (Get-Location) "conda-bld"
+          New-Item -ItemType Directory -Force -Path $CONDA_BLD_PATH
           
           # Build the package using the local recipe
-          conda build \
-            --python ${{ matrix.python }} \
-            --numpy ${{ matrix.numpy }} \
-            --output-folder $CONDA_BLD_PATH \
+          conda build `
+            --python ${{ matrix.python }} `
+            --numpy ${{ matrix.numpy }} `
+            --output-folder $CONDA_BLD_PATH `
             buildscripts/condarecipe.local
-
+          
           # Convert conda package to wheel
-          CONDA_PKG=$(ls $CONDA_BLD_PATH/win-64/numba-*.tar.bz2)
-          mkdir -p dist
+          $CONDA_PKG = Get-ChildItem $CONDA_BLD_PATH\win-64\numba-*.tar.bz2
+          New-Item -ItemType Directory -Force -Path dist
           conda convert $CONDA_PKG -o dist --platform win-64
 
       - name: Test package
-        shell: bash
+        shell: pwsh
         run: |
-          export PATH="/c/Miniconda3:/c/Miniconda3/Scripts:/c/Miniconda3/Library/bin:$PATH"
-          eval "$(/c/Miniconda3/Scripts/conda.exe 'shell.bash' 'hook')"
+          $env:PATH = "C:\Miniconda3;C:\Miniconda3\Scripts;C:\Miniconda3\Library\bin;$env:PATH"
+          
+          # Initialize conda for PowerShell
+          & C:\Miniconda3\Scripts\conda.exe "shell.powershell" "hook" | Out-String | Invoke-Expression
           
           # Create and activate test environment
           conda create -n test_env -y python=${{ matrix.python }}
@@ -110,12 +116,12 @@ jobs:
           
           # Install dependencies
           conda install -y numpy=${{ matrix.numpy }} llvmlite
-          if [[ "${{ matrix.tbb }}" == "true" ]]; then
+          if (${{ matrix.tbb }}) {
             conda install -y tbb tbb-devel
-          fi
+          }
           
           # Install and test the package
-          CONDA_PKG=$(ls conda-bld/win-64/numba-*.tar.bz2)
+          $CONDA_PKG = Get-ChildItem conda-bld\win-64\numba-*.tar.bz2
           conda install -y $CONDA_PKG
           python -m numba -s
 
