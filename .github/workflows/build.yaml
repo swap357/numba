@@ -10,7 +10,7 @@ on:
 jobs:
   build_sdist:
     name: Build SDist
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container: quay.io/pypa/manylinux2014_x86_64
     steps:
       - uses: actions/checkout@v4
@@ -31,16 +31,16 @@ jobs:
       matrix:
         include:
           # Linux x86_64
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             python: '3.9'
             platform: manylinux2014_x86_64
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             python: '3.10'
             platform: manylinux2014_x86_64
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             python: '3.11'
             platform: manylinux2014_x86_64
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             python: '3.12'
             platform: manylinux2014_x86_64
             
