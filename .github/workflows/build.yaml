@@ -108,8 +108,13 @@ jobs:
       - name: Setup Windows build environment
         if: runner.os == 'Windows'
         run: |
-          choco install llvm --version=14.0.6
-          echo "LLVM_CONFIG=C:\Program Files\LLVM\bin\llvm-config" >> $GITHUB_ENV
+          # Remove existing LLVM if present
+          choco uninstall llvm -y
+          # Install specific LLVM version
+          choco install llvm --version=14.0.6 --force -y
+          # Verify LLVM version and config
+          "C:\Program Files\LLVM\bin\llvm-config.exe" --version
+          echo "LLVM_CONFIG=C:\Program Files\LLVM\bin\llvm-config.exe" >> $GITHUB_ENV
 
       - name: Build wheel
         run: python setup.py bdist_wheel
