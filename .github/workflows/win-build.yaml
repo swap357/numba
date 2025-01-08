@@ -1,0 +1,117 @@
+name: Build Wheels
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  build_wheels:
+    name: ${{ matrix.os }} • py${{ matrix.python }} • np${{ matrix.numpy }}${{ matrix.tbb && ' • tbb' || '' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows x64 (with TBB)
+          - os: windows-latest
+            python: '3.10'
+            numpy: '2.0.0rc1'
+            tbb: true
+          - os: windows-latest
+            python: '3.11'
+            numpy: '2.0.0rc1'
+            tbb: true
+          - os: windows-latest
+            python: '3.12'
+            numpy: '2.0.0rc1'
+            tbb: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Miniconda
+        shell: pwsh
+        run: |
+          $wc = New-Object net.webclient
+          $wc.Downloadfile("https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe", "Miniconda3-latest-Windows-x86_64.exe")
+          Start-Process "Miniconda3-latest-Windows-x86_64.exe" "/S /D=C:\Miniconda3" -Wait
+          echo "C:\Miniconda3\Scripts" >> $env:GITHUB_PATH
+          echo "C:\Miniconda3\Library\bin" >> $env:GITHUB_PATH
+
+      - name: Setup build environment
+        shell: bash
+        run: |
+          export PATH="/c/Miniconda3:/c/Miniconda3/Scripts:/c/Miniconda3/Library/bin:$PATH"
+          
+          # Install conda-build and required packages
+          conda install -y conda-build conda-verify
+          
+          # Create build environment
+          conda create -n build_env -y -c numba -c ad-testing/label/numpy2 \
+            python=${{ matrix.python }} \
+            numpy=${{ matrix.numpy }} \
+            conda-build \
+            git
+
+          conda activate build_env
+          
+          # Install TBB if needed
+          if [[ "${{ matrix.tbb }}" == "true" ]]; then
+            python -m pip install -y tbb==2021.6 tbb-devel==2021.6
+          fi
+
+          # Install LLVM
+          choco uninstall llvm -y
+          choco install llvm --version=14.0.6 --force -y
+          echo "LLVM_CONFIG=C:\Program Files\LLVM\bin" >> $GITHUB_ENV
+
+      - name: Build package
+        shell: bash
+        run: |
+          export PATH="/c/Miniconda3:/c/Miniconda3/Scripts:/c/Miniconda3/Library/bin:$PATH"
+          source /c/Miniconda3/Scripts/activate build_env
+          
+          # Build using conda recipe
+          CONDA_BLD_PATH="$(pwd)/conda-bld"
+          mkdir -p $CONDA_BLD_PATH
+          
+          # Build the package using the local recipe
+          conda build \
+            --python ${{ matrix.python }} \
+            --numpy ${{ matrix.numpy }} \
+            --output-folder $CONDA_BLD_PATH \
+            buildscripts/condarecipe.local
+
+          # Convert conda package to wheel
+          CONDA_PKG=$(ls $CONDA_BLD_PATH/win-64/numba-*.tar.bz2)
+          mkdir -p dist
+          conda convert $CONDA_PKG -o dist --platform win-64
+
+      - name: Test package
+        shell: bash
+        run: |
+          export PATH="/c/Miniconda3:/c/Miniconda3/Scripts:/c/Miniconda3/Library/bin:$PATH"
+          
+          # Create test environment
+          conda create -n test_env -y python=${{ matrix.python }}
+          source /c/Miniconda3/Scripts/activate test_env
+          
+          # Install dependencies
+          conda install -y numpy=${{ matrix.numpy }} llvmlite
+          if [[ "${{ matrix.tbb }}" == "true" ]]; then
+            conda install -y tbb tbb-devel
+          fi
+          
+          # Install and test the package
+          CONDA_PKG=$(ls conda-bld/win-64/numba-*.tar.bz2)
+          conda install -y $CONDA_PKG
+          python -m numba -s
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-py${{ matrix.python }}-np${{ matrix.numpy }}${{ matrix.tbb && '-tbb' || '' }}
+          path: conda-bld/win-64/*.tar.bz2
