@@ -106,6 +106,28 @@ jobs:
         conda activate test_env
         conda list
 
+    - name: Build llvmlite
+      run: |
+        # Initialize conda for the shell
+        $Env:CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
+        $Env:_CE_M = ""
+        $Env:_CE_CONDA = ""
+        $Env:_CONDA_ROOT = "C:\Miniconda3"
+        $Env:_CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
+        (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
+        conda activate test_env
+        
+        # Clone and build llvmlite
+        git clone https://github.com/numba/llvmlite.git
+        cd llvmlite
+        # Get the latest tag
+        $latestTag = git describe --tags $(git rev-list --tags --max-count=1)
+        Write-Host "Building llvmlite from latest tag: $latestTag"
+        git checkout $latestTag
+        python setup.py build
+        python setup.py install
+        cd ..
+
     - name: Test Wheel
       run: |
         # Initialize conda for the shell
@@ -117,7 +139,6 @@ jobs:
         (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
         conda activate test_env
         cd dist
-        python -m pip install --extra-index-url https://pypi.anaconda.org/numba/label/wheels/simple llvmlite>=0.45.0dev0
         python -m pip install --extra-index https://pypi.anaconda.org/numba/label/wheels/simple (Get-Item *.whl).Name
         python -m pip list
         numba -s
