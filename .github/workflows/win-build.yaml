@@ -9,7 +9,7 @@ on:
 
 jobs:
   build_wheels:
-    name: ${{ matrix.os }} • py${{ matrix.python }} • np${{ matrix.numpy }}${{ matrix.tbb && ' • tbb' || '' }}
+    name: build_${{ matrix.platform }}_py${{ matrix.python }}_npy${{ matrix.numpy }}${{ matrix.tbb && '_tbb' || '' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -17,14 +17,17 @@ jobs:
         include:
           # Windows x64 (with TBB)
           - os: windows-latest
+            platform: win_64
             python: '3.10'
             numpy: '2.0.0rc1'
             tbb: true
           - os: windows-latest
+            platform: win_64
             python: '3.11'
             numpy: '2.0.0rc1'
             tbb: true
           - os: windows-latest
+            platform: win_64
             python: '3.12'
             numpy: '2.0.0rc1'
             tbb: true
@@ -113,5 +116,5 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-py${{ matrix.python }}-np${{ matrix.numpy }}${{ matrix.tbb && '-tbb' || '' }}
+          name: build_${{ matrix.platform }}_py${{ matrix.python }}_npy${{ matrix.numpy }}${{ matrix.tbb && '_tbb' || '' }}
           path: conda-bld/win-64/*.tar.bz2
