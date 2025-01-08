@@ -123,12 +123,18 @@ jobs:
         # Clone llvmlite
         git clone https://github.com/numba/llvmlite.git
         cd llvmlite
-        # List all tags and filter for dev version
-        $devTag = git tag -l "v*.dev*" | Sort-Object -Descending | Select-Object -First 1
-        if (-not $devTag) {
-            Write-Host "No dev tag found, falling back to latest tag"
-            $devTag = git describe --tags $(git rev-list --tags --max-count=1)
-        }
+        # Get all dev tags and sort them properly
+        $devTags = git tag -l "v*.dev*"
+        # Convert to version objects for proper sorting
+        $sortedTags = $devTags | ForEach-Object { 
+            $ver = $_ -replace '^v','' -replace '\.dev.*$',''
+            [PSCustomObject]@{
+                Tag = $_
+                Version = [version]$ver
+            }
+        } | Sort-Object -Property Version -Descending
+        
+        $devTag = $sortedTags[0].Tag
         Write-Host "Building llvmlite from tag: $devTag"
         git checkout $devTag
         
