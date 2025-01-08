@@ -123,10 +123,14 @@ jobs:
         # Clone llvmlite
         git clone https://github.com/numba/llvmlite.git
         cd llvmlite
-        # Get the latest tag
-        $latestTag = git describe --tags $(git rev-list --tags --max-count=1)
-        Write-Host "Building llvmlite from latest tag: $latestTag"
-        git checkout $latestTag
+        # List all tags and filter for dev version
+        $devTag = git tag -l "v*.dev*" | Sort-Object -Descending | Select-Object -First 1
+        if (-not $devTag) {
+            Write-Host "No dev tag found, falling back to latest tag"
+            $devTag = git describe --tags $(git rev-list --tags --max-count=1)
+        }
+        Write-Host "Building llvmlite from tag: $devTag"
+        git checkout $devTag
         
         # Build using conda recipe
         conda build conda-recipes/llvmlite
