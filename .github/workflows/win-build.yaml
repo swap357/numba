@@ -117,6 +117,7 @@ jobs:
         (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
         conda activate test_env
         cd dist
+        python -m pip install --extra-index-url https://pypi.anaconda.org/numba/label/wheels/simple llvmlite>=0.45.0dev0
         python -m pip install --extra-index https://pypi.anaconda.org/numba/label/wheels/simple (Get-Item *.whl).Name
         python -m pip list
         numba -s
