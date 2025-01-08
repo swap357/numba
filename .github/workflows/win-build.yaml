@@ -117,15 +117,22 @@ jobs:
         (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
         conda activate test_env
         
-        # Clone and build llvmlite
+        # Install conda-build
+        conda install conda-build -y
+        
+        # Clone llvmlite
         git clone https://github.com/numba/llvmlite.git
         cd llvmlite
         # Get the latest tag
         $latestTag = git describe --tags $(git rev-list --tags --max-count=1)
         Write-Host "Building llvmlite from latest tag: $latestTag"
         git checkout $latestTag
-        python setup.py build
-        python setup.py install
+        
+        # Build using conda recipe
+        conda build conda-recipes/llvmlite
+        
+        # Install the built package
+        conda install --use-local llvmlite -y
         cd ..
 
     - name: Test Wheel
