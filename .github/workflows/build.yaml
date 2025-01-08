@@ -199,11 +199,26 @@ jobs:
           fi
 
       - name: Check wheel
+        if: runner.os != 'Windows'
         run: |
           twine check dist/*.whl
           pip install llvmlite
-          pip install --no-deps dist/*.whl
+          WHEEL=$(ls dist/*.whl)
+          pip install --no-deps "$WHEEL"
           pip install numpy==${{ matrix.numpy }}
+          python setup.py build_ext --inplace
+          python -m numba -s
+
+      - name: Check wheel (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          twine check dist/*.whl
+          pip install llvmlite
+          $WHEEL = (Get-ChildItem dist/*.whl).Name
+          pip install --no-deps "dist/$WHEEL"
+          pip install numpy==${{ matrix.numpy }}
+          python setup.py build_ext --inplace
           python -m numba -s
 
       - name: Upload wheel artifact
