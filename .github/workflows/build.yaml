@@ -10,12 +10,13 @@ on:
 jobs:
   build_sdist:
     name: Build SDist
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     container: quay.io/pypa/manylinux2014_x86_64
     steps:
       - uses: actions/checkout@v4
       - name: Build SDist
         run: |
+          python3.10 -m pip install numpy==2.0.0
           python3.10 setup.py sdist
           ls dist/
       - uses: actions/upload-artifact@v4
@@ -24,46 +25,95 @@ jobs:
           path: dist/*.tar.gz
 
   build_wheels:
-    name: Build wheels on ${{ matrix.os }} for Python ${{ matrix.python }}
+    name: Build wheels on ${{ matrix.os }} for Python ${{ matrix.python }} with NumPy ${{ matrix.numpy }} ${{ matrix.tbb && 'with TBB' || '' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Linux x86_64
-          - os: ubuntu-24.04
+          # Linux x86_64 (with TBB)
+          - os: ubuntu-latest
             python: '3.10'
             platform: manylinux2014_x86_64
-          - os: ubuntu-24.04
+            numpy: '2.0.0'
+            tbb: true
+          - os: ubuntu-latest
+            python: '3.10'
+            platform: manylinux2014_x86_64
+            numpy: '2.1.3'
+            tbb: true
+          - os: ubuntu-latest
             python: '3.11'
             platform: manylinux2014_x86_64
-          - os: ubuntu-24.04
+            numpy: '2.0.0'
+            tbb: true
+          - os: ubuntu-latest
+            python: '3.11'
+            platform: manylinux2014_x86_64
+            numpy: '2.1.3'
+            tbb: true
+          - os: ubuntu-latest
             python: '3.12'
             platform: manylinux2014_x86_64
+            numpy: '2.0.0'
+            tbb: true
+          - os: ubuntu-latest
+            python: '3.12'
+            platform: manylinux2014_x86_64
+            numpy: '2.1.3'
+            tbb: true
             
-          # macOS x86_64
+          # macOS x86_64 (no TBB)
           - os: macos-latest
             python: '3.10'
+            numpy: '2.0.0'
+            tbb: false
+          - os: macos-latest
+            python: '3.10'
+            numpy: '2.1.3'
+            tbb: false
           - os: macos-latest
             python: '3.11'
+            numpy: '2.0.0'
+            tbb: false
+          - os: macos-latest
+            python: '3.11'
+            numpy: '2.1.3'
+            tbb: false
           - os: macos-latest
             python: '3.12'
-            
-          # macOS arm64
-          - os: macos-14
-            python: '3.10'
-          - os: macos-14
-            python: '3.11'
-          - os: macos-14
+            numpy: '2.0.0'
+            tbb: false
+          - os: macos-latest
             python: '3.12'
+            numpy: '2.1.3'
+            tbb: false
             
-          # Windows x64
+          # Windows x64 (with TBB)
           - os: windows-latest
             python: '3.10'
+            numpy: '2.0.0'
+            tbb: true
+          - os: windows-latest
+            python: '3.10'
+            numpy: '2.1.3'
+            tbb: true
           - os: windows-latest
             python: '3.11'
+            numpy: '2.0.0'
+            tbb: true
+          - os: windows-latest
+            python: '3.11'
+            numpy: '2.1.3'
+            tbb: true
           - os: windows-latest
             python: '3.12'
+            numpy: '2.0.0'
+            tbb: true
+          - os: windows-latest
+            python: '3.12'
+            numpy: '2.1.3'
+            tbb: true
 
     steps:
       - uses: actions/checkout@v4
@@ -76,7 +126,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install wheel setuptools twine
+          pip install wheel setuptools twine numpy==${{ matrix.numpy }}
+          ${{ matrix.tbb && 'pip install tbb==2021.6 tbb-devel==2021.6' || '' }}
           
       # Linux-specific setup
       - name: Setup Linux build environment
@@ -92,20 +143,16 @@ jobs:
       - name: Setup macOS build environment
         if: runner.os == 'macOS'
         run: |
-          brew install llvm@14
+          brew install llvm@14 llvm-openmp
           export LLVM_CONFIG=$(brew --prefix llvm@14)/bin/llvm-config
 
       # Windows-specific setup
       - name: Setup Windows build environment
         if: runner.os == 'Windows'
         run: |
-          # Remove existing LLVM if present
           choco uninstall llvm -y
-          # Install specific LLVM version
           choco install llvm --version=14.0.6 --force -y
-          # Set LLVM path
           echo "LLVM_CONFIG=C:\Program Files\LLVM\bin" | Out-File -FilePath $env:GITHUB_ENV -Append
-          # Verify LLVM installation
           if (!(Test-Path "C:\Program Files\LLVM\bin")) {
             Write-Error "LLVM installation not found"
             exit 1
@@ -121,18 +168,43 @@ jobs:
           pip install delocate
           delocate-wheel -v dist/*.whl
 
-      # Windows wheel validation
-      - name: Validate Windows wheel
-        if: runner.os == 'Windows'
+      # Linux wheel fixing
+      - name: Fix Linux wheel
+        if: runner.os == 'Linux'
         run: |
-          pip install lief
-          python -c "import lief; import pathlib; [print(f'Checking {p}') for p in pathlib.Path('dist').rglob('*.dll')]"
+          pip install auditwheel
+          cd dist
+          auditwheel repair *.whl
+          cd wheelhouse
+          
+          # Fix TBB and OpenMP paths if needed
+          if [ -d "numba.libs" ]; then
+            cd numba.libs
+            LIBTBB=$(compgen -W libtbb*)
+            LIBOMP=$(compgen -W libgomp*)
+            cd ..
+            
+            if [ "${{ matrix.tbb }}" = "true" ] && [ -n "$LIBTBB" ]; then
+              TBBEXT=$(echo "$LIBTBB" | grep -oP "(\.so.*)")
+              patchelf numba/np/ufunc/tbbpool*.so --replace-needed $LIBTBB libtbb$TBBEXT
+              patchelf numba/np/ufunc/tbbpool*.so --remove-rpath
+            fi
+            
+            if [ -n "$LIBOMP" ]; then
+              OMPEXT=$(echo "$LIBOMP" | grep -oP "(\.so.*)")
+              patchelf numba/np/ufunc/omppool*.so --replace-needed $LIBOMP libgomp$OMPEXT
+              patchelf numba/np/ufunc/omppool*.so --remove-rpath
+            fi
+          fi
 
       - name: Check wheel
-        run: twine check dist/*.whl
+        run: |
+          twine check dist/*.whl
+          pip install dist/*.whl
+          python -m numba -s
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os }}-py${{ matrix.python }}
+          name: wheels-${{ matrix.os }}-py${{ matrix.python }}${{ matrix.tbb && '-tbb' || '' }}
           path: dist/*.whl
