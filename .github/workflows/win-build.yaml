@@ -49,6 +49,11 @@ jobs:
         run: |
           export PATH="/c/Miniconda3:/c/Miniconda3/Scripts:/c/Miniconda3/Library/bin:$PATH"
           
+          # Initialize conda for bash shell
+          source /c/Miniconda3/Scripts/activate
+          conda init bash
+          source ~/.bashrc
+          
           # Install conda-build and required packages
           conda install -y conda-build conda-verify
           
@@ -59,7 +64,8 @@ jobs:
             conda-build \
             git
 
-          conda activate build_env
+          # Activate environment
+          source /c/Miniconda3/Scripts/activate build_env
           
           # Install TBB if needed
           if [[ "${{ matrix.tbb }}" == "true" ]]; then
@@ -75,6 +81,7 @@ jobs:
         shell: bash
         run: |
           export PATH="/c/Miniconda3:/c/Miniconda3/Scripts:/c/Miniconda3/Library/bin:$PATH"
+          source /c/Miniconda3/Scripts/activate
           source /c/Miniconda3/Scripts/activate build_env
           
           # Build using conda recipe
@@ -97,8 +104,9 @@ jobs:
         shell: bash
         run: |
           export PATH="/c/Miniconda3:/c/Miniconda3/Scripts:/c/Miniconda3/Library/bin:$PATH"
+          source /c/Miniconda3/Scripts/activate
           
-          # Create test environment
+          # Create and activate test environment
           conda create -n test_env -y python=${{ matrix.python }}
           source /c/Miniconda3/Scripts/activate test_env
           
