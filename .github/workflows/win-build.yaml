@@ -82,7 +82,6 @@ jobs:
         $Env:_CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
         (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
         conda activate build_env
-        # Show Python version to verify correct version
         python --version
         python setup.py -q bdist_wheel
         Get-ChildItem dist
@@ -96,8 +95,14 @@ jobs:
         $Env:_CONDA_ROOT = "C:\Miniconda3"
         $Env:_CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
         (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
-        # Create and activate test environment
-        conda create -n test_env python=${{ matrix.python }} numpy=${{ matrix.numpy }} "wheel>=0.32" twine -y
+        conda create -n test_env `
+          python=${{ matrix.python }} `
+          numpy=${{ matrix.numpy }} `
+          "wheel>=0.32" `
+          twine `
+          -c numba `
+          -c ad-testing/label/numpy2 `
+          -y
         conda activate test_env
         conda list
 
