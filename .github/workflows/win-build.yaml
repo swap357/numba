@@ -74,11 +74,13 @@ jobs:
 
     - name: Build Wheel
       run: |
-        # Initialize conda for PowerShell
-        conda init powershell
-        # Reload PowerShell profile to apply conda initialization
-        & $profile
-        # Activate and build in the same step
+        # Initialize conda for the shell
+        $Env:CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
+        $Env:_CE_M = ""
+        $Env:_CE_CONDA = ""
+        $Env:_CONDA_ROOT = "C:\Miniconda3"
+        $Env:_CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
+        (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
         conda activate build_env
         # Show Python version to verify correct version
         python --version
@@ -87,17 +89,27 @@ jobs:
 
     - name: Create Test Environment
       run: |
-        # Initialize conda for PowerShell
-        conda init powershell
-        & $profile
+        # Initialize conda for the shell
+        $Env:CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
+        $Env:_CE_M = ""
+        $Env:_CE_CONDA = ""
+        $Env:_CONDA_ROOT = "C:\Miniconda3"
+        $Env:_CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
+        (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
+        # Create and activate test environment
+        conda create -n test_env python=${{ matrix.python }} numpy=${{ matrix.numpy }} "wheel>=0.32" twine -y
         conda activate test_env
         conda list
 
     - name: Test Wheel
       run: |
-        # Initialize conda for PowerShell
-        conda init powershell
-        & $profile
+        # Initialize conda for the shell
+        $Env:CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
+        $Env:_CE_M = ""
+        $Env:_CE_CONDA = ""
+        $Env:_CONDA_ROOT = "C:\Miniconda3"
+        $Env:_CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
+        (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
         conda activate test_env
         cd dist
         python -m pip install --extra-index https://pypi.anaconda.org/numba/label/wheels/simple (Get-Item *.whl).Name
