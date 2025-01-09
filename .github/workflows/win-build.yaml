@@ -42,7 +42,7 @@ jobs:
         shell: pwsh
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -152,7 +152,7 @@ jobs:
         numba -s
 
     - name: Upload Wheel Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: numba-${{ matrix.platform }}-py${{ matrix.python }}-npy${{ matrix.numpy }}${{ matrix.tbb && '-tbb' || '' }}
         path: dist/*.whl
