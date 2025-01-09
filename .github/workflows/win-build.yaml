@@ -123,20 +123,30 @@ jobs:
         # Clone llvmlite
         git clone https://github.com/numba/llvmlite.git
         cd llvmlite
-        # Get all dev tags and sort them properly
-        $devTags = git tag -l "v*.dev*"
-        # Convert to version objects for proper sorting
-        $sortedTags = $devTags | ForEach-Object { 
-            $ver = $_ -replace '^v','' -replace '\.dev.*$',''
-            [PSCustomObject]@{
-                Tag = $_
-                Version = [version]$ver
-            }
-        } | Sort-Object -Property Version -Descending
         
-        $devTag = $sortedTags[0].Tag
-        Write-Host "Building llvmlite from tag: $devTag"
-        git checkout $devTag
+        # Get all tags and find latest dev version
+        git fetch --tags
+        $tags = git tag --list "v*.dev*"
+        Write-Host "Available dev tags:"
+        $tags | ForEach-Object { Write-Host $_ }
+        
+        # Parse versions and sort
+        $versions = $tags | ForEach-Object {
+            $ver = $_ -replace '^v',''
+            if ($ver -match '(\d+)\.(\d+)\.(\d+)') {
+                [PSCustomObject]@{
+                    Tag = $_
+                    Major = [int]$Matches[1]
+                    Minor = [int]$Matches[2]
+                    Patch = [int]$Matches[3]
+                    FullVersion = "$($Matches[1]).$($Matches[2]).$($Matches[3])"
+                }
+            }
+        } | Sort-Object Major,Minor,Patch -Descending
+        
+        $latestDevTag = $versions[0].Tag
+        Write-Host "Selected latest dev tag: $latestDevTag"
+        git checkout $latestDevTag
         
         # Build using conda recipe
         conda build conda-recipes/llvmlite
