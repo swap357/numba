@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      llvmlite_version:
+        description: 'llvmlite version (e.g. ">=0.45.0dev0,<0.45" or leave empty for latest)'
+        required: false
+        type: string
 
 jobs:
   build_wheels:
@@ -86,6 +91,30 @@ jobs:
         python setup.py -q bdist_wheel
         Get-ChildItem dist
 
+    - name: Get Latest llvmlite Version
+      if: ${{ !inputs.llvmlite_version }}
+      run: |
+        # Initialize conda
+        $Env:CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
+        $Env:_CE_M = ""
+        $Env:_CE_CONDA = ""
+        $Env:_CONDA_ROOT = "C:\Miniconda3"
+        $Env:_CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
+        (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
+        
+        # Get latest version from numba channel
+        $latest_version = conda search -c numba llvmlite --json | ConvertFrom-Json
+        $versions = $latest_version.llvmlite | ForEach-Object {$_.version}
+        $latest = $versions | Sort-Object -Descending | Select-Object -First 1
+        Write-Host "LLVMLITE_VERSION=$latest" >> $env:GITHUB_ENV
+        Write-Host "Using latest llvmlite version: $latest"
+
+    - name: Set User Specified llvmlite Version
+      if: ${{ inputs.llvmlite_version }}
+      run: |
+        Write-Host "LLVMLITE_VERSION=${{ inputs.llvmlite_version }}" >> $env:GITHUB_ENV
+        Write-Host "Using specified llvmlite version: ${{ inputs.llvmlite_version }}"
+
     - name: Create Test Environment
       run: |
         # Initialize conda for the shell
@@ -100,60 +129,12 @@ jobs:
           numpy=${{ matrix.numpy }} `
           "wheel>=0.32" `
           twine `
+          "llvmlite$env:LLVMLITE_VERSION" `
           -c numba `
           -c ad-testing/label/numpy2 `
           -y
         conda activate test_env
         conda list
-
-    - name: Build llvmlite
-      run: |
-        # Initialize conda for the shell
-        $Env:CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
-        $Env:_CE_M = ""
-        $Env:_CE_CONDA = ""
-        $Env:_CONDA_ROOT = "C:\Miniconda3"
-        $Env:_CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
-        (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
-        conda activate test_env
-        
-        # Install conda-build
-        conda install conda-build -y
-        
-        # Clone llvmlite
-        git clone https://github.com/numba/llvmlite.git
-        cd llvmlite
-        
-        # Get all tags and find latest dev version
-        git fetch --tags
-        $tags = git tag --list "v*.dev*"
-        Write-Host "Available dev tags:"
-        $tags | ForEach-Object { Write-Host $_ }
-        
-        # Parse versions and sort
-        $versions = $tags | ForEach-Object {
-            $ver = $_ -replace '^v',''
-            if ($ver -match '(\d+)\.(\d+)\.(\d+)') {
-                [PSCustomObject]@{
-                    Tag = $_
-                    Major = [int]$Matches[1]
-                    Minor = [int]$Matches[2]
-                    Patch = [int]$Matches[3]
-                    FullVersion = "$($Matches[1]).$($Matches[2]).$($Matches[3])"
-                }
-            }
-        } | Sort-Object Major,Minor,Patch -Descending
-        
-        $latestDevTag = $versions[0].Tag
-        Write-Host "Selected latest dev tag: $latestDevTag"
-        git checkout $latestDevTag
-        
-        # Build using conda recipe
-        conda build conda-recipes/llvmlite
-        
-        # Install the built package
-        conda install --use-local llvmlite -y
-        cd ..
 
     - name: Test Wheel
       run: |
