@@ -79,7 +79,11 @@ jobs:
         $Env:_CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
         (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
         conda activate build_env
-        python --version
+
+        # Build C extensions first
+        python setup.py build_ext --inplace
+        
+        # Then build wheel
         python setup.py -q bdist_wheel
         Get-ChildItem dist
 
@@ -138,8 +142,13 @@ jobs:
         $Env:_CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
         (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
         conda activate test_env
+        
+        # Install in development mode first
+        python setup.py develop
+        
+        # Then install the wheel
         cd dist
-        python -m pip install (Get-Item *.whl).Name
+        python -m pip install --force-reinstall (Get-Item *.whl).Name
         cd ..
         python -c "import numba; print(numba.__version__)"
 
