@@ -128,6 +128,21 @@ jobs:
         conda activate test_env
         conda list
 
+    - name: Install Built Wheel
+      run: |
+        # Initialize conda for the shell
+        $Env:CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
+        $Env:_CE_M = ""
+        $Env:_CE_CONDA = ""
+        $Env:_CONDA_ROOT = "C:\Miniconda3"
+        $Env:_CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
+        (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
+        conda activate test_env
+        cd dist
+        python -m pip install (Get-Item *.whl).Name
+        cd ..
+        python -c "import numba; print(numba.__version__)"
+
     - name: Run Numba Tests
       run: |
         # Initialize conda for the shell
