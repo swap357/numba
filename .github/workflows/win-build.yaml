@@ -136,7 +136,7 @@ jobs:
         conda activate test_env
         conda list
 
-    - name: Test Wheel
+    - name: Run Numba Tests
       run: |
         # Initialize conda for the shell
         $Env:CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
@@ -146,10 +146,20 @@ jobs:
         $Env:_CONDA_EXE = "C:\Miniconda3\Scripts\conda.exe"
         (& "C:\Miniconda3\Scripts\conda.exe" "shell.powershell" "hook") | Out-String | Invoke-Expression
         conda activate test_env
-        cd dist
-        python -m pip install --extra-index https://pypi.anaconda.org/numba/label/wheels/simple (Get-Item *.whl).Name
-        python -m pip list
-        numba -s
+        
+        # Install test dependencies from meta.yaml test.requires
+        conda install -y `
+          jinja2 `
+          cffi `
+          scipy `
+          ipython `
+          setuptools `
+          tbb>=2021.6 `
+          ipykernel `
+          -c numba
+
+        # Run the test suite
+        python -m numba.runtests -v
 
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v4
