@@ -174,8 +174,8 @@ jobs:
           ipykernel `
           -c numba
 
-        # Run the test suite
-        python -m numba.runtests -j 4 -v numba.tests.doc_examples
+        # Run the test suite with 4 processes
+        python -m numba.runtests -m 4 -v numba.tests.doc_examples
 
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v4
