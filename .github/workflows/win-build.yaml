@@ -1,10 +1,6 @@
 name: build-numba-whl-win64
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
     inputs:
       llvmlite_version:
