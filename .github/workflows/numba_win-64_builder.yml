@@ -75,4 +75,4 @@ jobs:
           conda install conda-build
 
       - name: Run tests
-        run: conda build --test win-64/numba*.conda
+        run: conda build -c numba/label/dev -c defaults --test win-64/numba*.conda
