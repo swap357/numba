@@ -30,7 +30,7 @@ requirements:
     - llvm-openmp              # [osx]
   host:
     - python
-    - numpy 2.0
+    - numpy {{ numpy_build }}
     - setuptools
     # On channel https://anaconda.org/numba/
     - llvmlite >=0.45.0dev0,<0.45
