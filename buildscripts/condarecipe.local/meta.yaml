@@ -39,7 +39,13 @@ requirements:
     - tbb-devel >=2021.6       # [not (aarch64 or ppc64le)]
   run:
     - python >=3.10
-    - numpy >=1.24
+    {% if PY_VER == "3.10" %}
+    - numpy >=1.24,<2.0
+    {% elif PY_VER == "3.13" %}
+    - numpy >=2.1
+    {% else %}
+    - numpy >=1.26
+    {% endif %}
     # On channel https://anaconda.org/numba/
     - llvmlite >=0.45.0dev0,<0.45
   run_constrained:
