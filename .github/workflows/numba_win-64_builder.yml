@@ -75,4 +75,6 @@ jobs:
           conda install conda-build
 
       - name: Run tests
+        env:
+          NUMBA_DISABLE_CUDA: 1 # Disable CUDA tests on Windows
         run: conda build -c numba/label/dev -c defaults --test win-64/numba*.conda
