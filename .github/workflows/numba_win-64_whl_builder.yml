@@ -63,11 +63,11 @@ jobs:
         run: |
           set -x
           if [ "${{ inputs.llvmlite_run_id }}" != "" ]; then
-              pip install ${{ env.LOCAL_LLVMLITE_ARTIFACT_PATH }}/*.whl
+              CHAN="file:///${{ env.LOCAL_LLVMLITE_ARTIFACT_PATH }}"
           else
               CHAN="${{ env.CONDA_CHANNEL_NUMBA }}"
           fi
-          conda install -c "$CHAN" llvmlite numpy setuptools tbb-devel python-build
+          conda install -c "$CHAN" llvmlite>=0.45.0 numpy setuptools tbb-devel python-build
 
       - name: Build wheel
         run: python -m build
