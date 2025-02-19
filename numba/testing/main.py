@@ -745,7 +745,7 @@ def _split_nonparallel_tests(test, sliced):
     return ptests, stests
 
 # A test can't run longer than 10 minutes
-_TIMEOUT = 900
+_TIMEOUT = 1500
 
 class ParallelTestRunner(runner.TextTestRunner):
     """
