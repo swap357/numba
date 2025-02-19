@@ -101,6 +101,4 @@ jobs:
         env:
           TESTS_TO_RUN: "numba.tests"
           NUMBA_DISABLE_CUDA: 1
-          NUMBA_TEST_TIMEOUT: 600
-          NUMBA_NUM_THREADS: 2
         run: conda build -c numba/label/dev -c defaults --test win-64/numba*.conda
