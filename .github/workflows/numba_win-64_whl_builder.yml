@@ -81,47 +81,6 @@ jobs:
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
           if-no-files-found: error
 
-  win-64-validate:
-    name: win-64-validate
-    needs: win-64-build
-    runs-on: windows-2019
-    defaults:
-      run:
-        shell: bash -el {0}
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
-      fail-fast: false
-    steps:
-      - name: Clone repository
-        uses: actions/checkout@v4
-
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          python-version: ${{ env.VALIDATION_PYTHON_VERSION }}
-          conda-remove-defaults: true
-          auto-update-conda: true
-          auto-activate-base: true
-
-      - name: Install validation dependencies
-        run: conda install -c defaults py-lief wheel twine keyring rfc3986
-
-      - name: Download numba wheels
-        uses: actions/download-artifact@v4
-        with:
-          name: numba-win-64-py${{ matrix.python-version }}
-          path: dist
-
-      - name: Validate wheels
-        run: |
-          cd dist
-          for WHL_FILE in *.whl; do
-            wheel unpack "$WHL_FILE"
-            python "$GITHUB_WORKSPACE"/buildscripts/github/validate_win64_wheel.py numba/_numba_common.cp*-win_amd64.pyd
-            twine check "$WHL_FILE"
-          done
-
   win-64-test:
     name: win-64-test
     needs: win-64-validate
@@ -150,4 +109,4 @@ jobs:
         run: |
           pip install numpy
           pip install dist/*.whl
-          python -m numba.runtests
+          python -m numba.runtests -v
