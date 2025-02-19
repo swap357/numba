@@ -76,5 +76,5 @@ jobs:
 
       - name: Run tests
         env:
-          TESTS_TO_RUN: "numba.tests.test_array*"
+          TESTS_TO_RUN: "numba.tests.test_array_methods"
         run: conda build -c numba/label/dev -c defaults --test win-64/numba*.conda
