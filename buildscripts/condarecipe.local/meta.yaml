@@ -30,7 +30,7 @@ requirements:
     - llvm-openmp              # [osx]
   host:
     - python
-    - numpy {{ numpy_build }}
+    - numpy {{ numpy }}
     - setuptools
     # On channel https://anaconda.org/numba/
     - llvmlite >=0.45.0dev0,<0.45
@@ -39,13 +39,7 @@ requirements:
     - tbb-devel >=2021.6       # [not (aarch64 or ppc64le)]
   run:
     - python >=3.10
-    {% if PY_VER == "3.10" %}
-    - numpy >=1.24,<2.0
-    {% elif PY_VER == "3.13" %}
-    - numpy >=2.1
-    {% else %}
-    - numpy >=1.26
-    {% endif %}
+    - numpy {{ numpy }}
     # On channel https://anaconda.org/numba/
     - llvmlite >=0.45.0dev0,<0.45
   run_constrained:
@@ -75,7 +69,7 @@ test:
     - scipy
     # At least NumPy 1.26.0 has an issue with arctanh on glibc<=2.17.
     # ref: https://github.com/numpy/numpy/issues/25087
-    - numpy !=1.26.0           # [(linux and x86_64) or win]
+    - numpy {{ numpy }}
     - ipython                  # [not aarch64]
     # for pycc
     - setuptools
