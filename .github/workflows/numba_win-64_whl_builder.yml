@@ -67,7 +67,7 @@ jobs:
           else
               CHAN="${{ env.CONDA_CHANNEL_NUMBA }}"
           fi
-          conda install -c "$CHAN" llvmlite>=0.45.0 numpy setuptools tbb-devel python-build
+          conda install -c "$CHAN" llvmlite==0.44.0 numpy setuptools tbb-devel python-build
 
       - name: Build wheel
         run: python -m build
