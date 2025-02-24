@@ -39,17 +39,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Cache conda packages
-        id: cache
-        if: ${{ !inputs.force_build }}
-        uses: actions/cache@v3
-        with:
-          path: |
-            conda_channel_dir
-          key: ${{ runner.os }}-conda-${{ matrix.python-version }}-${{ hashFiles('buildscripts/condarecipe.local/**') }}
-          restore-keys: |
-            ${{ runner.os }}-conda-${{ matrix.python-version }}-
-
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -61,7 +50,6 @@ jobs:
         run: conda install conda-build
 
       - name: Build Numba conda package
-        if: steps.cache.outputs.cache-hit != 'true' || inputs.force_build
         run: |
           CONDA_CHANNEL_DIR="conda_channel_dir"
           mkdir -p $CONDA_CHANNEL_DIR
@@ -93,23 +81,23 @@ jobs:
         include:
           # Python 3.10
           - python-version: "3.10"
-            numpy_test: "2.0.*"
+            numpy_test: "2.0"
           
           # Python 3.11
           - python-version: "3.11"
-            numpy_test: "2.0.*"
+            numpy_test: "2.0"
           - python-version: "3.11"
-            numpy_test: "2.1.*"
+            numpy_test: "2.1"
           
           # Python 3.12
           - python-version: "3.12"
-            numpy_test: "2.0.*"
+            numpy_test: "2.0"
           - python-version: "3.12"
-            numpy_test: "2.1.*"
+            numpy_test: "2.1"
           
           # Python 3.13
           - python-version: "3.13"
-            numpy_test: "2.1.*"
+            numpy_test: "2.1"
       fail-fast: false
 
     steps:
@@ -124,7 +112,6 @@ jobs:
       - name: Install conda-build
         run: |
           conda install conda-build
-          conda install numpy==${{ matrix.numpy_test }}
 
       - name: Run tests
         env:
@@ -133,5 +120,6 @@ jobs:
         run: |
           echo "Testing with NumPy ${{ matrix.numpy_test }}"
           conda build -c numba/label/dev -c defaults \
+            --numpy=${{ matrix.numpy_test }} \
             --test \
             win-64/numba*.conda
