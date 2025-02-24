@@ -112,7 +112,6 @@ jobs:
       - name: Install conda-build
         run: |
           conda install conda-build
-          conda install numpy=${{ matrix.numpy_test }}
 
       - name: Run tests
         env:
@@ -121,6 +120,6 @@ jobs:
         run: |
           echo "Testing with NumPy ${{ matrix.numpy_test }}"
           conda build -c numba/label/dev -c defaults \
-            --numpy=${{ matrix.numpy_test }} \
+            --extra-deps numpy=${{ matrix.numpy_test }} \
             --test \
             win-64/numba*.conda
