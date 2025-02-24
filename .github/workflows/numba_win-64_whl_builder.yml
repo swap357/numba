@@ -94,10 +94,33 @@ jobs:
       fail-fast: false
 
     steps:
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.python-version }}
+          conda-remove-defaults: true
+          auto-update-conda: true
+          auto-activate-base: true
+
+      - name: Download llvmlite Artifact
+        if: ${{ inputs.llvmlite_run_id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: llvmlite-win-64-py${{ matrix.python-version }}
+          path: llvmlite_wheels
+          run-id: ${{ inputs.llvmlite_run_id }}
+          repository: ${{ github.repository }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install build dependencies
+        run: |
+          set -x
+          if [ "${{ inputs.llvmlite_run_id }}" != "" ]; then
+              CHAN="file:///${{ env.LOCAL_LLVMLITE_ARTIFACT_PATH }}"
+          else
+              CHAN="${{ env.CONDA_CHANNEL_NUMBA }}"
+          fi
+          conda install -c "$CHAN" llvmlite numpy
 
       - name: Download numba wheel
         uses: actions/download-artifact@v4
@@ -107,6 +130,5 @@ jobs:
 
       - name: Install and test
         run: |
-          pip install numpy
           pip install dist/*.whl
-          python -m numba.runtests -v
+          python -m numba.runtests -v -m 
