@@ -93,30 +93,30 @@ jobs:
         include:
           # Python 3.10
           - python-version: "3.10"
-            numpy_test: "2.0"
+            numpy_test: "2.0.*"
           
           # Python 3.11
           - python-version: "3.11"
-            numpy_test: "2.0"
+            numpy_test: "2.0.*"
           - python-version: "3.11"
-            numpy_test: "2.1"
+            numpy_test: "2.1.*"
           
           # Python 3.12
           - python-version: "3.12"
-            numpy_test: "2.0"
+            numpy_test: "2.0.*"
           - python-version: "3.12"
-            numpy_test: "2.1"
+            numpy_test: "2.1.*"
           
           # Python 3.13
           - python-version: "3.13"
-            numpy_test: "2.1"
+            numpy_test: "2.1.*"
       fail-fast: false
 
     steps:
       - name: Setup miniconda
         uses: conda-incubator/setup-miniconda@v3
 
-      - name: Download llvmlite artifact
+      - name: Download numba conda package
         uses: actions/download-artifact@v4
         with:
           name: numba_win-64_conda_py${{ matrix.python-version }}
@@ -124,6 +124,7 @@ jobs:
       - name: Install conda-build
         run: |
           conda install conda-build
+          conda install numpy==${{ matrix.numpy_test }}
 
       - name: Run tests
         env:
@@ -133,5 +134,4 @@ jobs:
           echo "Testing with NumPy ${{ matrix.numpy_test }}"
           conda build -c numba/label/dev -c defaults \
             --test \
-            --numpy=${{ matrix.numpy_test }} \
             win-64/numba*.conda
