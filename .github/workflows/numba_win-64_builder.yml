@@ -128,7 +128,7 @@ jobs:
 
       - name: Run tests
         env:
-          TESTS_TO_RUN: "numba.tests.doc_examples"
+          TESTS_TO_RUN: "numba.tests.test_np_functions.TestNPFunctions"
           NUMBA_ENABLE_CUDASIM: 1
         run: |
           echo "Testing with NumPy ${{ matrix.numpy_test }}"
