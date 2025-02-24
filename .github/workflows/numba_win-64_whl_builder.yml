@@ -18,7 +18,7 @@ concurrency:
 
 env:
   LOCAL_LLVMLITE_ARTIFACT_PATH: D:/a/numba/numba/llvmlite_wheels
-  CONDA_CHANNEL_NUMBA: numba/label/win64_wheel
+  CONDA_CHANNEL_NUMBA: numba/label/ci
   VALIDATION_PYTHON_VERSION: "3.12"
   ARTIFACT_RETENTION_DAYS: 7
   FALLBACK_LLVMLITE_VERSION: "15"
@@ -67,7 +67,7 @@ jobs:
           else
               CHAN="${{ env.CONDA_CHANNEL_NUMBA }}"
           fi
-          conda install -c "$CHAN" llvmlite==0.44.0 numpy setuptools tbb-devel python-build
+          conda install -c "$CHAN" llvmlite numpy setuptools tbb-devel python-build
 
       - name: Build wheel
         run: python -m build
