@@ -56,7 +56,7 @@ jobs:
           name: llvmlite-win-64-py${{ matrix.python-version }}
           path: llvmlite_wheels
           run-id: ${{ inputs.llvmlite_run_id }}
-          repository: ${{ github.repository }}
+          repository: numba/llvmlite
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install build dependencies
@@ -109,7 +109,7 @@ jobs:
           name: llvmlite-win-64-py${{ matrix.python-version }}
           path: llvmlite_wheels
           run-id: ${{ inputs.llvmlite_run_id }}
-          repository: ${{ github.repository }}
+          repository: numba/llvmlite
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install build dependencies
@@ -131,4 +131,4 @@ jobs:
       - name: Install and test
         run: |
           pip install dist/*.whl
-          python -m numba.runtests -v -m 
+          python -m numba.runtests -v -m
