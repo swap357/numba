@@ -157,4 +157,4 @@ jobs:
       - name: Install and test
         run: |
           pip install dist/*.whl
-          python -m numba.runtests -v -m
+          python -m numba.runtests -j 1:100 -v -m
