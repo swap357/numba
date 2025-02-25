@@ -25,7 +25,7 @@ env:
 
 jobs:
   win-64-build:
-    name: win-64-build-conda (py ${{ matrix.python-version }}, np ${{ matrix.numpy_build }})
+    name: win-64-build-wheel (py ${{ matrix.python-version }}, np ${{ matrix.numpy_build }})
     runs-on: windows-2019
     defaults:
       run:
@@ -95,7 +95,7 @@ jobs:
           if-no-files-found: error
 
   win-64-test:
-    name: win-64-test-conda (py ${{ matrix.python-version }}, np ${{ matrix.numpy_build }})
+    name: win-64-test-wheel (py ${{ matrix.python-version }}, np ${{ matrix.numpy_build }})
     needs: win-64-build
     runs-on: windows-2019
     defaults:
