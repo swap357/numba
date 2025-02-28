@@ -20,6 +20,7 @@ concurrency:
 env:
   LOCAL_LLVMLITE_ARTIFACT_PATH: /home/runner/work/numba/numba/llvmlite_conda
   CONDA_CHANNEL_NUMBA: numba/label/dev
+  NEED_CATCHSEGV: true
 
 jobs:
   linux-64-build-conda:
@@ -127,6 +128,12 @@ jobs:
       fail-fast: false
 
     steps:
+      - name: Install system dependencies
+        if: env.NEED_CATCHSEGV == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libc6-dbg
+
       - name: Setup miniconda
         uses: conda-incubator/setup-miniconda@v3
 
