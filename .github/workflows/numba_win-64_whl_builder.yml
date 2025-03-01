@@ -6,8 +6,12 @@ on:
       - .github/workflows/numba_win-64_whl_builder.yml
   workflow_dispatch:
     inputs:
-      llvmlite_run_id:
-        description: 'llvmlite workflow run ID (optional)'
+      llvmlite_conda_runid:
+        description: 'llvmlite conda workflow run ID (optional)'
+        required: false
+        type: string
+      llvmlite_wheel_runid:
+        description: 'llvmlite wheel workflow run ID (optional)'
         required: false
         type: string
 
@@ -17,8 +21,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  LOCAL_LLVMLITE_ARTIFACT_PATH: D:/a/numba/numba/llvmlite_wheels
-  CONDA_CHANNEL_NUMBA: numba/label/ci
+  LOCAL_LLVMLITE_ARTIFACT_PATH: D:/a/numba/numba/llvmlite_conda
+  CONDA_CHANNEL_NUMBA: numba/label/dev
   VALIDATION_PYTHON_VERSION: "3.12"
   ARTIFACT_RETENTION_DAYS: 7
   FALLBACK_LLVMLITE_VERSION: "15"
@@ -58,19 +62,19 @@ jobs:
           auto-activate-base: true
 
       - name: Download llvmlite Artifact
-        if: ${{ inputs.llvmlite_run_id != '' }}
+        if: ${{ inputs.llvmlite_conda_runid != '' }}
         uses: actions/download-artifact@v4
         with:
-          name: llvmlite-win-64-py${{ matrix.python-version }}
-          path: llvmlite_wheels
-          run-id: ${{ inputs.llvmlite_run_id }}
+          name: llvmlite_win-64_conda_py${{ matrix.python-version }}
+          path: llvmlite_conda
+          run-id: ${{ inputs.llvmlite_conda_runid }}
           repository: numba/llvmlite
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install build dependencies
         run: |
           set -x
-          if [ "${{ inputs.llvmlite_run_id }}" != "" ]; then
+          if [ "${{ inputs.llvmlite_conda_runid }}" != "" ]; then
               CHAN="file:///${{ env.LOCAL_LLVMLITE_ARTIFACT_PATH }}"
           else
               CHAN="${{ env.CONDA_CHANNEL_NUMBA }}"
@@ -95,6 +99,7 @@ jobs:
           if-no-files-found: error
 
   win-64-test:
+    if: ${{ inputs.llvmlite_wheel_runid != '' }}
     name: win-64-test-wheel (py ${{ matrix.python-version }}, np ${{ matrix.numpy_test }})
     needs: win-64-build
     runs-on: windows-2019
@@ -120,6 +125,15 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Download llvmlite wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: llvmlite-win-64-py${{ matrix.python-version }}
+          path: llvmlite_wheels
+          run-id: ${{ inputs.llvmlite_wheel_runid }}
+          repository: numba/llvmlite
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Download numba wheel
         uses: actions/download-artifact@v4
         with:
@@ -128,5 +142,7 @@ jobs:
 
       - name: Install and test
         run: |
-          pip install dist/*.whl
+          python -m pip install numpy==${{ matrix.numpy_test }} tbb==2021.6 tbb-devel==2021.6
+          python -m pip install llvmlite_wheels/*.whl
+          python -m pip install dist/*.whl
           python -m numba.runtests -j 1:100 -v -m
