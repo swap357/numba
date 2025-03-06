@@ -59,12 +59,25 @@ jobs:
       - name: Setup Xcode
         run: |
           sudo xcode-select -s /Applications/Xcode_14.1.0.app/Contents/Developer
-          export CONDA_BUILD_SYSROOT=/Applications/Xcode_14.1.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
-          export SDKROOT=/Applications/Xcode_14.1.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+          
+          # Set up environment variables
           export MACOSX_DEPLOYMENT_TARGET=10.9
+          export CONDA_BUILD_SYSROOT=/Applications/Xcode_14.1.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.0.sdk
+          export SDKROOT=/Applications/Xcode_14.1.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.0.sdk
+          
+          # Add compiler flags to work around TAPI issues
+          export CFLAGS="-I$SDKROOT/usr/include -arch x86_64"
+          export CXXFLAGS="-I$SDKROOT/usr/include -arch x86_64"
+          export LDFLAGS="-L$SDKROOT/usr/lib -arch x86_64"
+          
+          # Export to GitHub Actions environment
+          echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET" >> $GITHUB_ENV
           echo "CONDA_BUILD_SYSROOT=$CONDA_BUILD_SYSROOT" >> $GITHUB_ENV
           echo "SDKROOT=$SDKROOT" >> $GITHUB_ENV
-          echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET" >> $GITHUB_ENV
+          echo "CFLAGS=$CFLAGS" >> $GITHUB_ENV
+          echo "CXXFLAGS=$CXXFLAGS" >> $GITHUB_ENV
+          echo "LDFLAGS=$LDFLAGS" >> $GITHUB_ENV
+          
           xcodebuild -version  # Verify version
 
       - name: Setup Miniconda
