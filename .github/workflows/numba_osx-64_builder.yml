@@ -24,7 +24,7 @@ env:
 jobs:
   osx-64-build-conda:
     name: osx-64-build-conda (py ${{ matrix.python-version }}, np ${{ matrix.numpy_build }})
-    runs-on: macos-latest
+    runs-on: macos-13
     defaults:
       run:
         shell: bash -elx {0}
@@ -98,7 +98,7 @@ jobs:
   osx-64-test:
     name: osx-64-test-conda (py ${{ matrix.python-version }}, np ${{ matrix.numpy_test }})
     needs: osx-64-build-conda
-    runs-on: macos-latest
+    runs-on: macos-13
     defaults:
       run:
         shell: bash -elx {0}
