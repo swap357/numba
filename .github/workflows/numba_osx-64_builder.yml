@@ -47,9 +47,18 @@ jobs:
         with:
           fetch-depth: 0
       
+      - name: Check Available Xcode Versions
+        run: |
+          echo "Checking Xcode installations..."
+          ls -l /Applications/ | grep "Xcode"
+          echo "Current Xcode path:"
+          xcode-select -p
+          echo "Available SDKs:"
+          ls /Applications/Xcode*/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/
+
       - name: Setup Xcode
         run: |
-          sudo xcode-select -s /Applications/Xcode_14.2.app/Contents/Developer
+          sudo xcode-select -s /Applications/Xcode_14.1.app/Contents/Developer
           xcodebuild -version  # Verify version
 
       - name: Setup Miniconda
