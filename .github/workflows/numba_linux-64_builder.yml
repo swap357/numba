@@ -132,7 +132,11 @@ jobs:
         if: env.NEED_CATCHSEGV == 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libc6-dbg
+          sudo apt-get install -y libc6-dbg glibc-tools
+          # Verify catchsegv is available and get its path
+          which catchsegv
+          # Make sure the libraries are in the system path
+          sudo ldconfig
 
       - name: Setup miniconda
         uses: conda-incubator/setup-miniconda@v3
