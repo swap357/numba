@@ -58,7 +58,22 @@ jobs:
       
       - name: Setup Xcode
         run: |
-          sudo xcode-select -s /Applications/Xcode_14.2.app/Contents/Developer
+          # Use Xcode 14.1 with its native SDK
+          sudo xcode-select -s /Applications/Xcode_14.1.app/Contents/Developer
+          
+          # Get the SDK path that matches this Xcode version
+          SDK_PATH=/Applications/Xcode_14.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.0.sdk
+          
+          # Set all three required variables to ensure alignment
+          export CONDA_BUILD_SYSROOT=$SDK_PATH
+          export MACOSX_DEPLOYMENT_TARGET=10.10
+          export macos_min_version=10.10
+          
+          # Export to GitHub Actions environment
+          echo "CONDA_BUILD_SYSROOT=$CONDA_BUILD_SYSROOT" >> $GITHUB_ENV
+          echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET" >> $GITHUB_ENV
+          echo "macos_min_version=$macos_min_version" >> $GITHUB_ENV
+          
           xcodebuild -version  # Verify version
 
       - name: Setup Miniconda
