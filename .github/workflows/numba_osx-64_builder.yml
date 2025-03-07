@@ -58,22 +58,29 @@ jobs:
 
       - name: Setup Xcode
         run: |
-          sudo xcode-select -s /Applications/Xcode_14.1.0.app/Contents/Developer
+          # Use Xcode 14.1 with explicit SDK
+          sudo xcode-select -s /Applications/Xcode_14.1.app/Contents/Developer
           
-          # Set up environment variables
-          export MACOSX_DEPLOYMENT_TARGET=10.9
-          export CONDA_BUILD_SYSROOT=/Applications/Xcode_14.1.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.0.sdk
-          export SDKROOT=/Applications/Xcode_14.1.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.0.sdk
+          # Set deployment target to match build.sh
+          export MACOSX_DEPLOYMENT_TARGET=10.10
           
-          # Add compiler flags to work around TAPI issues
-          export CFLAGS="-I$SDKROOT/usr/include -arch x86_64"
-          export CXXFLAGS="-I$SDKROOT/usr/include -arch x86_64"
-          export LDFLAGS="-L$SDKROOT/usr/lib -arch x86_64"
+          # Use explicit SDK paths
+          export SDKROOT=/Applications/Xcode_14.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.0.sdk
+          
+          # Force use of specific SDK and add linker flags
+          export CONDA_BUILD_SYSROOT=$SDKROOT
+          export CFLAGS="-isysroot $SDKROOT -mmacosx-version-min=10.10"
+          export CXXFLAGS="-isysroot $SDKROOT -mmacosx-version-min=10.10"
+          export LDFLAGS="-isysroot $SDKROOT -mmacosx-version-min=10.10 -Wl,-syslibroot,$SDKROOT"
+          
+          # Ensure conda-build uses the correct SDK
+          mkdir -p ~/.conda/
+          echo "CONDA_BUILD_SYSROOT = $SDKROOT" > ~/.conda/conda_build_config.yaml
           
           # Export to GitHub Actions environment
           echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET" >> $GITHUB_ENV
-          echo "CONDA_BUILD_SYSROOT=$CONDA_BUILD_SYSROOT" >> $GITHUB_ENV
           echo "SDKROOT=$SDKROOT" >> $GITHUB_ENV
+          echo "CONDA_BUILD_SYSROOT=$SDKROOT" >> $GITHUB_ENV
           echo "CFLAGS=$CFLAGS" >> $GITHUB_ENV
           echo "CXXFLAGS=$CXXFLAGS" >> $GITHUB_ENV
           echo "LDFLAGS=$LDFLAGS" >> $GITHUB_ENV
