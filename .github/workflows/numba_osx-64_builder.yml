@@ -46,35 +46,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Check Available Xcode Versions
-        run: |
-          echo "Checking Xcode installations..."
-          ls -l /Applications/ | grep "Xcode"
-          echo "Current Xcode path:"
-          xcode-select -p
-          echo "Available SDKs:"
-          ls /Applications/Xcode*/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/
-      
-      - name: Setup Xcode
-        run: |
-          # Use Xcode 14.1 with its native SDK
-          sudo xcode-select -s /Applications/Xcode_14.1.app/Contents/Developer
-          
-          # Get the SDK path that matches this Xcode version
-          SDK_PATH=/Applications/Xcode_14.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.0.sdk
-          
-          # Set all three required variables to ensure alignment
-          export CONDA_BUILD_SYSROOT=$SDK_PATH
-          export MACOSX_DEPLOYMENT_TARGET=10.10
-          export macos_min_version=10.10
-          
-          # Export to GitHub Actions environment
-          echo "CONDA_BUILD_SYSROOT=$CONDA_BUILD_SYSROOT" >> $GITHUB_ENV
-          echo "MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET" >> $GITHUB_ENV
-          echo "macos_min_version=$macos_min_version" >> $GITHUB_ENV
-          
-          xcodebuild -version  # Verify version
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3

@@ -13,4 +13,14 @@ if [[ "$(uname -s)" == *"Linux"* ]] && [[ "$(uname -p)" == *"ppc64le"* ]]; then
     export CXX="$CXX -pthread"
 fi
 
+if [[ "$(uname -s)" == *"Darwin"* ]]; then
+    # The following is suggested in https://docs.conda.io/projects/conda-build/en/latest/resources/compiler-tools.html?highlight=SDK#macos-sdk
+    wget -q https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX10.10.sdk.tar.xz
+    shasum -c ./buildscripts/incremental/MacOSX10.10.sdk.checksum
+    tar -xf ./MacOSX10.10.sdk.tar.xz
+    export SDKROOT=`pwd`/MacOSX10.10.sdk
+    export CONDA_BUILD_SYSROOT=`pwd`/MacOSX10.10.sdk
+    export macos_min_version=10.10
+fi
+
 MACOSX_DEPLOYMENT_TARGET=10.10 $PYTHON setup.py build_ext $EXTRA_BUILD_EXT_FLAGS build install --single-version-externally-managed --record=record.txt
