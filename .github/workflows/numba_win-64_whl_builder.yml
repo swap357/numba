@@ -84,16 +84,30 @@ jobs:
           conda install -c "$CHAN" llvmlite setuptools python-build numpy==${{ matrix.numpy_build }}
           
           # Install TBB with specific versions
-          python -m pip install tbb==2021.6 tbb-devel==2021.6
+          python -m pip install tbb-devel==2021.6
+
+      - name: Build sdist [once - py3.10]
+        if: matrix.python-version == '3.10'
+        run: python -m build --sdist
 
       - name: Build wheel
-        run: python -m build
-
+        run: python -m build --wheel
+      
       - name: Upload numba wheel
         uses: actions/upload-artifact@v4
         with:
           name: numba-win-64-py${{ matrix.python-version }}-np${{ matrix.numpy_build }}-tbb
           path: dist/*.whl
+          compression-level: 0
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: error
+
+      - name: Upload numba sdist
+        if: matrix.python-version == '3.10'
+        uses: actions/upload-artifact@v4
+        with:
+          name: numba-sdist
+          path: dist/*.tar.gz
           compression-level: 0
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
           if-no-files-found: error
@@ -131,7 +145,7 @@ jobs:
           name: llvmlite-win-64-py${{ matrix.python-version }}
           path: llvmlite_wheels
           run-id: ${{ inputs.llvmlite_wheel_runid }}
-          repository: numba/llvmlite
+          repository: swap357/llvmlite
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download numba wheel
@@ -142,7 +156,8 @@ jobs:
 
       - name: Install and test
         run: |
-          python -m pip install numpy==${{ matrix.numpy_test }} tbb==2021.6 tbb-devel==2021.6
+          python -m pip install numpy==${{ matrix.numpy_test }} tbb==2021.6
           python -m pip install llvmlite_wheels/*.whl
           python -m pip install dist/*.whl
+          python -m numba -s
           python -m numba.runtests -j 1:100 -v -m
