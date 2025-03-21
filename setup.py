@@ -255,8 +255,11 @@ def get_ext_modules():
         # They are binary compatible and may not safely coexist in a process, as
         # libiomp5 is more prevalent and often linked in for NumPy it is used
         # here!
-        ompcompileflags = ['-fopenmp']
-        omplinkflags = ['-fopenmp=libiomp5']
+        
+        # Apple clang doesn't support -fopenmp directly, use -Xclang approach
+        # https://mac.r-project.org/openmp/
+        ompcompileflags = ['-Xclang', '-fopenmp']
+        omplinkflags = ['-lomp']
         omppath = ['lib', 'clang', '*', 'include', 'omp.h']
         have_openmp = check_file_at_path(omppath)
     else:

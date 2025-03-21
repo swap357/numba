@@ -30,11 +30,6 @@ case "${PLATFORM}" in
             
             # Install OpenMP via conda only for build env
             conda install --yes llvm-openmp
-        else
-            # For test environment
-            if command -v brew &> /dev/null; then
-                brew install libomp
-            fi
         fi
         ;;
     
@@ -43,36 +38,36 @@ case "${PLATFORM}" in
         if [ "${BUILD_ENV}" == "build" ]; then
             # Install OpenMP via conda only for build env
             conda install --yes llvm-openmp
-        else
-            # For test environment
-            if command -v brew &> /dev/null; then
-                brew install libomp
-            fi
         fi
         ;;
     
     "linux-64")
         echo "Setting up Linux dependencies"
-        if command -v apt-get &> /dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y build-essential libomp-dev
-        fi
         
-        # Install TBB for Linux-64
-        echo "Installing TBB for Linux-64"
-        python -m pip install tbb==2021.6 tbb-devel==2021.6
+        # Install TBB based on environment
+        if [ "${BUILD_ENV}" == "build" ]; then
+            echo "Installing TBB-devel for build environment"
+            python -m pip install tbb-devel==2021.6
+        elif [ "${BUILD_ENV}" == "test" ]; then
+            echo "Installing TBB for test environment"
+            python -m pip install tbb==2021.6
+        fi
         ;;
     
     "linux-aarch64")
-        
         ;;
     
     "win-64")
         echo "Setting up Windows dependencies"
         
-        # Install TBB for Windows
-        echo "Installing TBB for Windows"
-        python -m pip install tbb==2021.6 tbb-devel==2021.6
+        # Install TBB based on environment
+        if [ "${BUILD_ENV}" == "build" ]; then
+            echo "Installing TBB-devel for build environment"
+            python -m pip install tbb==2021.6 tbb-devel==2021.6
+        elif [ "${BUILD_ENV}" == "test" ]; then
+            echo "Installing TBB for test environment"
+            python -m pip install tbb==2021.6
+        fi
         ;;
     
     *)
