@@ -28,10 +28,10 @@ case "${PLATFORM}" in
             sudo tar -xf MacOSX10.10.sdk.tar.xz -C /opt
             echo "macOS SDK setup complete"
             
-            # Install OpenMP via conda (only for build environment)
+            # Install OpenMP via conda only for build env
             conda install --yes llvm-openmp
         else
-            # For test environment, install OpenMP via pip or homebrew
+            # For test environment
             if command -v brew &> /dev/null; then
                 brew install libomp
             fi
@@ -41,10 +41,10 @@ case "${PLATFORM}" in
     "osx-arm64")
         echo "Setting up for osx-arm64 build"
         if [ "${BUILD_ENV}" == "build" ]; then
-            # Install OpenMP via conda (only for build environment)
+            # Install OpenMP via conda only for build env
             conda install --yes llvm-openmp
         else
-            # For test environment, install OpenMP via pip or homebrew
+            # For test environment
             if command -v brew &> /dev/null; then
                 brew install libomp
             fi

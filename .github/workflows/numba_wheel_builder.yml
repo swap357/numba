@@ -122,7 +122,9 @@ jobs:
           conda install -c "$CHAN" llvmlite setuptools python-build numpy==${{ matrix.numpy_build }}
 
       - name: Build wheel
-        run: python -m build
+        run: |
+            conda install llvm-openmp
+            python -m build
 
       - name: Upload numba wheel
         uses: actions/upload-artifact@v4
