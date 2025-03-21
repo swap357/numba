@@ -86,11 +86,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup platform-specific requirements
-        run: |
-          chmod +x ./buildscripts/github/setup_platform.sh
-          ./buildscripts/github/setup_platform.sh "${{ matrix.platform }}"
-
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -98,6 +93,11 @@ jobs:
           conda-remove-defaults: true
           auto-update-conda: true
           auto-activate-base: true
+
+      - name: Setup platform-specific requirements
+        run: |
+          chmod +x ./buildscripts/github/setup_platform.sh
+          ./buildscripts/github/setup_platform.sh "${{ matrix.platform }}" "build"
 
       - name: Download llvmlite Artifact
         if: ${{ inputs.llvmlite_conda_runid != '' }}
@@ -120,14 +120,6 @@ jobs:
           
           # Install llvmlite from the appropriate channel
           conda install -c "$CHAN" llvmlite setuptools python-build numpy==${{ matrix.numpy_build }}
-          
-          # Install TBB only for platforms that require it
-          if [[ "${{ matrix.platform }}" == "linux-64" || "${{ matrix.platform }}" == "win-64" ]]; then
-            echo "Installing TBB for ${{ matrix.platform }}"
-            python -m pip install tbb-devel==2021.6
-          else
-            echo "Skipping TBB installation for ${{ matrix.platform }}"
-          fi
 
       - name: Build wheel
         run: python -m build
@@ -157,15 +149,15 @@ jobs:
       - name: Clone repository
         uses: actions/checkout@v4
 
-      - name: Setup platform-specific requirements
-        run: |
-          chmod +x ./buildscripts/github/setup_platform.sh
-          ./buildscripts/github/setup_platform.sh "${{ matrix.platform }}"
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Setup platform-specific requirements
+        run: |
+          chmod +x ./buildscripts/github/setup_platform.sh
+          ./buildscripts/github/setup_platform.sh "${{ matrix.platform }}" "test"
 
       - name: Download llvmlite wheel
         uses: actions/download-artifact@v4
@@ -185,15 +177,6 @@ jobs:
       - name: Install and test
         run: |
           python -m pip install numpy==${{ matrix.numpy_test }}
-          
-          # Install TBB only for platforms that require it
-          if [[ "${{ matrix.platform }}" == "linux-64" || "${{ matrix.platform }}" == "win-64" ]]; then
-            echo "Installing TBB for ${{ matrix.platform }}"
-            python -m pip install tbb==2021.6
-          else
-            echo "Skipping TBB installation for ${{ matrix.platform }}"
-          fi
-          
           python -m pip install llvmlite_wheels/*.whl
           python -m pip install dist/*.whl
           python -m numba.runtests -j 1:100 -v -m
