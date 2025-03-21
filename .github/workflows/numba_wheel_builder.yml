@@ -121,6 +121,16 @@ jobs:
           # Install llvmlite from the appropriate channel
           conda install -c "$CHAN" llvmlite setuptools python-build numpy==${{ matrix.numpy_build }}
 
+      - name: Configure OpenMP for macOS
+        if: ${{ startsWith(matrix.platform, 'osx-') }}
+        run: |
+          # Install OpenMP via conda
+          conda install --yes llvm-openmp
+          
+          # Set minimal compiler and linker flags for OpenMP
+          echo "CFLAGS=-I$CONDA_PREFIX/include -Xclang -fopenmp" >> $GITHUB_ENV
+          echo "CXXFLAGS=-I$CONDA_PREFIX/include -Xclang -fopenmp" >> $GITHUB_ENV
+          echo "LDFLAGS=-L$CONDA_PREFIX/lib -lomp" >> $GITHUB_ENV
 
       - name: Build wheel
         run: python -m build

@@ -27,22 +27,10 @@ case "${PLATFORM}" in
             sudo mkdir -p /opt
             sudo tar -xf MacOSX10.10.sdk.tar.xz -C /opt
             echo "macOS SDK setup complete"
-            
-            # Install OpenMP via conda only for build env
-            conda install --yes llvm-openmp
-            # flag to help linker find libomp
-            export LDFLAGS="-L$CONDA_PREFIX/lib -lomp"
         fi
         ;;
     
     "osx-arm64")
-        echo "Setting up for osx-arm64 build"
-        if [ "${BUILD_ENV}" == "build" ]; then
-            # Install OpenMP via conda only for build env
-            conda install --yes llvm-openmp
-            # flag to help linker find libomp
-            export LDFLAGS="-L$CONDA_PREFIX/lib -lomp"
-        fi
         ;;
     
     "linux-64")
