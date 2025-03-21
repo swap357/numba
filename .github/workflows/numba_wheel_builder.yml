@@ -1,0 +1,185 @@
+name: numba_wheel_builder
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/numba_wheel_builder.yml
+      - buildscripts/github/numba_wheel_evaluate.py
+      - buildscripts/github/setup_platform.sh
+  label:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      llvmlite_conda_runid:
+        description: 'llvmlite conda workflow run ID (optional)'
+        required: false
+        type: string
+      llvmlite_wheel_runid:
+        description: 'llvmlite wheel workflow run ID (optional)'
+        required: false
+        type: string
+      platform:
+        description: 'Platform to build wheels for'
+        default: 'all'
+        required: true
+        type: choice
+        options:
+          - 'all'
+          - 'linux-64'
+          - 'linux-aarch64'
+          - 'osx-64'
+          - 'osx-arm64'
+          - 'win-64'
+
+# Add concurrency control
+concurrency:
+  group: >-
+    ${{ github.workflow }}-
+    ${{ github.event.pull_request.number 
+      || toJson(github.event.inputs)
+      || github.event.label.name
+      || github.sha }}
+  cancel-in-progress: true
+
+env:
+  LOCAL_LLVMLITE_ARTIFACT_PATH: llvmlite_conda
+  CONDA_CHANNEL_NUMBA: numba/label/dev
+  VALIDATION_PYTHON_VERSION: "3.12"
+  ARTIFACT_RETENTION_DAYS: 7
+  FALLBACK_LLVMLITE_VERSION: "15"
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    outputs:
+      build_matrix: ${{ steps.evaluate.outputs.build_matrix }}
+      test_matrix: ${{ steps.evaluate.outputs.test_matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Evaluate
+        id: evaluate
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_LABEL_NAME: ${{ github.event.label.name }}
+          GITHUB_WORKFLOW_INPUT: ${{ toJson(github.event.inputs) }}
+        run: |
+          chmod +x ./buildscripts/github/numba_wheel_evaluate.py
+          ./buildscripts/github/numba_wheel_evaluate.py
+
+  wheel-build:
+    name: build-wheel-${{ matrix.platform }}-py${{ matrix.python-version }}-np${{ matrix.numpy_build }}
+    needs: check
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash -el {0}
+    strategy:
+      matrix: ${{fromJson(needs.check.outputs.build_matrix)}}
+      fail-fast: false
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup platform-specific requirements
+        run: |
+          chmod +x ./buildscripts/github/setup_platform.sh
+          ./buildscripts/github/setup_platform.sh "${{ matrix.platform }}"
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          conda-remove-defaults: true
+          auto-update-conda: true
+          auto-activate-base: true
+
+      - name: Download llvmlite Artifact
+        if: ${{ inputs.llvmlite_conda_runid != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: llvmlite-${{ matrix.platform }}-py${{ matrix.python-version }}
+          path: llvmlite_conda
+          run-id: ${{ inputs.llvmlite_conda_runid }}
+          repository: numba/llvmlite
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install build dependencies
+        run: |
+          set -x
+          if [ "${{ inputs.llvmlite_conda_runid }}" != "" ]; then
+              CHAN="file:///$PWD/${{ env.LOCAL_LLVMLITE_ARTIFACT_PATH }}"
+          else
+              CHAN="${{ env.CONDA_CHANNEL_NUMBA }}"
+          fi
+          
+          # Install llvmlite from the appropriate channel
+          conda install -c "$CHAN" llvmlite setuptools python-build numpy==${{ matrix.numpy_build }}
+          
+          # Install TBB with specific versions
+          python -m pip install tbb-devel==2021.6
+
+      - name: Build wheel
+        run: python -m build
+
+      - name: Upload numba wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: numba-${{ matrix.platform }}-py${{ matrix.python-version }}-np${{ matrix.numpy_build }}-tbb
+          path: dist/*.whl
+          compression-level: 0
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: error
+
+  wheel-test:
+    if: ${{ inputs.llvmlite_wheel_runid != '' }}
+    name: test-wheel-${{ matrix.platform }}-py${{ matrix.python-version }}-np${{ matrix.numpy_test }}
+    needs: [check, wheel-build]
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash -el {0}
+    strategy:
+      matrix: ${{fromJson(needs.check.outputs.test_matrix)}}
+      fail-fast: false
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Setup platform-specific requirements
+        run: |
+          chmod +x ./buildscripts/github/setup_platform.sh
+          ./buildscripts/github/setup_platform.sh "${{ matrix.platform }}"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download llvmlite wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: llvmlite-${{ matrix.platform }}-py${{ matrix.python-version }}
+          path: llvmlite_wheels
+          run-id: ${{ inputs.llvmlite_wheel_runid }}
+          repository: numba/llvmlite
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download numba wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: numba-${{ matrix.platform }}-py${{ matrix.python-version }}-np${{ matrix.numpy_test }}-tbb
+          path: dist
+
+      - name: Install and test
+        run: |
+          python -m pip install numpy==${{ matrix.numpy_test }} tbb==2021.6
+          python -m pip install llvmlite_wheels/*.whl
+          python -m pip install dist/*.whl
+          python -m numba.runtests -j 1:100 -v -m 
