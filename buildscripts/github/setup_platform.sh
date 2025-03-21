@@ -30,6 +30,8 @@ case "${PLATFORM}" in
             
             # Install OpenMP via conda only for build env
             conda install --yes llvm-openmp
+            # flag to help linker find libomp
+            export LDFLAGS="-L$CONDA_PREFIX/lib -lomp"
         fi
         ;;
     
@@ -38,6 +40,8 @@ case "${PLATFORM}" in
         if [ "${BUILD_ENV}" == "build" ]; then
             # Install OpenMP via conda only for build env
             conda install --yes llvm-openmp
+            # flag to help linker find libomp
+            export LDFLAGS="-L$CONDA_PREFIX/lib -lomp"
         fi
         ;;
     
