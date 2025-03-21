@@ -127,9 +127,9 @@ jobs:
           # Install OpenMP via conda
           conda install --yes llvm-openmp
           
-          # Set compiler flags for OpenMP
-          echo "CFLAGS=-I$CONDA_PREFIX/include" >> $GITHUB_ENV
-          echo "CXXFLAGS=-I$CONDA_PREFIX/include" >> $GITHUB_ENV
+          # Set compiler flags for OpenMP - fix for clang not supporting -fopenmp directly
+          echo "CFLAGS=-I$CONDA_PREFIX/include -Xclang -fopenmp" >> $GITHUB_ENV
+          echo "CXXFLAGS=-I$CONDA_PREFIX/include -Xclang -fopenmp" >> $GITHUB_ENV
           echo "LDFLAGS=-L$CONDA_PREFIX/lib -lomp -Wl,-rpath,$CONDA_PREFIX/lib" >> $GITHUB_ENV
 
       - name: Build wheel
