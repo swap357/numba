@@ -85,7 +85,7 @@ jobs:
           fi
           
           # Install llvmlite from the appropriate channel
-          conda install -c "$CHAN" llvmlite setuptools python-build numpy==${{ matrix.numpy_build }} clang_osx-64 clangxx_osx-64
+          conda install -c "$CHAN" llvmlite setuptools python-build numpy==${{ matrix.numpy_build }}
 
       - name: Build sdist [once - py3.10]
         if: matrix.python-version == '3.10'
