@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  LOCAL_LLVMLITE_ARTIFACT_PATH: D:/a/numba/numba/llvmlite_conda
+  LOCAL_LLVMLITE_ARTIFACT_PATH: llvmlite_conda
   CONDA_CHANNEL_NUMBA: numba/label/dev
   VALIDATION_PYTHON_VERSION: "3.12"
   ARTIFACT_RETENTION_DAYS: 7
@@ -69,7 +69,7 @@ jobs:
         if: ${{ inputs.llvmlite_conda_runid != '' }}
         uses: actions/download-artifact@v4
         with:
-          name: llvmlite-win-64-py${{ matrix.python-version }}
+          name: llvmlite-osx-64-py${{ matrix.python-version }}
           path: llvmlite_conda
           run-id: ${{ inputs.llvmlite_conda_runid }}
           repository: numba/llvmlite
@@ -79,13 +79,16 @@ jobs:
         run: |
           set -x
           if [ "${{ inputs.llvmlite_conda_runid }}" != "" ]; then
-              CHAN="file:///${{ env.LOCAL_LLVMLITE_ARTIFACT_PATH }}"
+              CHAN="file://${{ github.workspace }}/llvmlite_conda"
           else
               CHAN="${{ env.CONDA_CHANNEL_NUMBA }}"
           fi
           
           # Install llvmlite from the appropriate channel
           conda install -c "$CHAN" llvmlite setuptools python-build numpy==${{ matrix.numpy_build }} llvm-openmp
+          echo "CFLAGS=-I$CONDA_PREFIX/include -Xclang -fopenmp" >> $GITHUB_ENV
+          echo "CXXFLAGS=-I$CONDA_PREFIX/include -Xclang -fopenmp" >> $GITHUB_ENV
+          echo "LDFLAGS=-L$CONDA_PREFIX/lib -lomp" >> $GITHUB_ENV
 
       - name: Build sdist [once - py3.10]
         if: matrix.python-version == '3.10'
