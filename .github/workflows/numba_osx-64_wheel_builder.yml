@@ -113,7 +113,8 @@ jobs:
         run: |
           pip install delocate
           ls -l dist
-          delocate-wheel -v dist/*.whl
+          delocate-wheel -v -L $CONDA_PREFIX/lib dist/*.whl
+          echo "Delocate finished. Listing dist again:"
           ls -l dist
 
       - name: Upload numba wheel
