@@ -103,8 +103,18 @@ jobs:
       
       - name: Build wheel
         run: |
-          export CC=$CONDA_PREFIX/bin/clang
-          export CXX=$CONDA_PREFIX/bin/clang++
+          echo "--- Debug Info Before Build ---"
+          echo "CONDA_PREFIX: $CONDA_PREFIX"
+          echo "which clang: $(which clang || echo 'clang not found')"
+          echo "which clang++: $(which clang++ || echo 'clang++ not found')"
+          echo "CC: ${CC:-<not set>}"
+          echo "CXX: ${CXX:-<not set>}"
+          echo "CFLAGS: ${CFLAGS:-<not set>}"
+          echo "CXXFLAGS: ${CXXFLAGS:-<not set>}"
+          echo "LDFLAGS: ${LDFLAGS:-<not set>}"
+          echo "Listing $CONDA_PREFIX/bin:"
+          ls -l $CONDA_PREFIX/bin || echo "Could not list $CONDA_PREFIX/bin"
+          echo "--- Starting Build ---"
           python -m build
 
       - name: Upload numba wheel
