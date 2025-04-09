@@ -85,8 +85,8 @@ jobs:
           fi
           
           # Install llvmlite from the appropriate channel
-          conda install -c "$CHAN" llvmlite setuptools python-build numpy==${{ matrix.numpy_build }} delocate
-      
+          conda install -c "$CHAN" --yes llvmlite setuptools python-build numpy==${{ matrix.numpy_build }}
+
       - name: Configure OpenMP for macOS
         run: |
            # Install OpenMP via conda
@@ -111,6 +111,7 @@ jobs:
 
       - name: Delocate wheel
         run: |
+          pip install delocate
           ls -l dist
           delocate-wheel -v dist/*.whl
           ls -l dist
