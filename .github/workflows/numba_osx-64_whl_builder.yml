@@ -86,10 +86,8 @@ jobs:
           
           # Install llvmlite from the appropriate channel
           conda install -c "$CHAN" llvmlite setuptools python-build numpy==${{ matrix.numpy_build }} llvm-openmp
-          echo "CC=$CONDA_PREFIX/bin/clang" >> $GITHUB_ENV
-          echo "CXX=$CONDA_PREFIX/bin/clang++" >> $GITHUB_ENV
-          echo "CFLAGS=-I$CONDA_PREFIX/include -fopenmp" >> $GITHUB_ENV
-          echo "CXXFLAGS=-I$CONDA_PREFIX/include -fopenmp" >> $GITHUB_ENV
+          echo "CFLAGS=-I$CONDA_PREFIX/include -Xclang -fopenmp" >> $GITHUB_ENV
+          echo "CXXFLAGS=-I$CONDA_PREFIX/include -Xclang -fopenmp" >> $GITHUB_ENV
           echo "LDFLAGS=-L$CONDA_PREFIX/lib -lomp" >> $GITHUB_ENV
 
       - name: Build sdist [once - py3.10]
