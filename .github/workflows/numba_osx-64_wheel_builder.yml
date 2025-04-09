@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       llvmlite_conda_runid:
-        description: 'llvmlite conda workflow run ID (optional)'
+        description: 'llvmlite conda workflow run ID for build(optional)'
         required: false
         type: string
       llvmlite_wheel_runid:
-        description: 'llvmlite wheel workflow run ID (optional)'
+        description: 'llvmlite wheel workflow run ID for tests(optional)'
         required: false
         type: string
 
