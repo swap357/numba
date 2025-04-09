@@ -102,7 +102,10 @@ jobs:
         run: python -m build --sdist
       
       - name: Build wheel
-        run: python -m build
+        run: |
+          export CC=$CONDA_PREFIX/bin/clang
+          export CXX=$CONDA_PREFIX/bin/clang++
+          python -m build
 
       - name: Upload numba wheel
         uses: actions/upload-artifact@v4
