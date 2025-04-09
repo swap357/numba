@@ -102,20 +102,7 @@ jobs:
         run: python -m build --sdist
       
       - name: Build wheel
-        run: |
-          echo "--- Debug Info Before Build ---"
-          echo "CONDA_PREFIX: $CONDA_PREFIX"
-          echo "which clang: $(which clang || echo 'clang not found')"
-          echo "which clang++: $(which clang++ || echo 'clang++ not found')"
-          echo "CC: ${CC:-<not set>}"
-          echo "CXX: ${CXX:-<not set>}"
-          echo "CFLAGS: ${CFLAGS:-<not set>}"
-          echo "CXXFLAGS: ${CXXFLAGS:-<not set>}"
-          echo "LDFLAGS: ${LDFLAGS:-<not set>}"
-          echo "Listing $CONDA_PREFIX/bin:"
-          ls -l $CONDA_PREFIX/bin || echo "Could not list $CONDA_PREFIX/bin"
-          echo "--- Starting Build ---"
-          python -m build
+        run: python -m build
 
       - name: Upload numba wheel
         uses: actions/upload-artifact@v4
