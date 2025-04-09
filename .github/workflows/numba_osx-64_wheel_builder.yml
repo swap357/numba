@@ -3,7 +3,7 @@ name: numba_osx-64_wheel_builder
 on:
   pull_request:
     paths:
-    - .github/workflows/numba_osx-64_whl_builder.yml
+    - .github/workflows/numba_osx-64_wheel_builder.yml
   workflow_dispatch:
     inputs:
       llvmlite_conda_runid:
