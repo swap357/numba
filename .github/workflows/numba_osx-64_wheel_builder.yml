@@ -87,9 +87,9 @@ jobs:
 
       - name: Fix macOS wheel library paths
         run: |
-          chmod +x ./buildscripts/github/patch_wheel_dylib.py
-          $PYTHON_PATH ./buildscripts/github/patch_wheel_dylib.py dist/*.whl
           cd dist
+          chmod +x ../buildscripts/github/patch_wheel_dylib.py
+          $PYTHON_PATH ../buildscripts/github/patch_wheel_dylib.py ./*.whl
           ls -la ./*.whl
           echo "--- Removing platform tag ---"
           $PYTHON_PATH -m wheel tags --remove --platform-tag=macosx_10_15_x86_64 ./numba*.whl
