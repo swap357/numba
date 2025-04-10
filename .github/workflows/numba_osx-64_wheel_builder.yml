@@ -280,7 +280,7 @@ jobs:
           echo "--- Downloading latest public Numba wheel for py${{ matrix.python-version }} ---"
           mkdir public_wheel
           # Attempt to download the wheel matching the built platform tag
-          pip download numba --dest public_wheel --platform=macosx_10_15_x86_64 --python-version=${{ matrix.python-version }} --implementation=cp --abi=cp${{ matrix.python-version }} --only-binary=:all: --no-deps
+          pip download numba --dest public_wheel --platform=macosx_10_15_x86_64 --python-version=${{ matrix.python-version }} --only-binary=:all: --no-deps
           if [ ! -f public_wheel/numba*.whl ]; then
             echo "WARNING: Could not download specific public wheel for py${{ matrix.python-version }}/macosx_10_15. Trying without platform tag."
             pip download numba --dest public_wheel --python-version=${{ matrix.python-version }} --implementation=cp --abi=cp${{ matrix.python-version }} --only-binary=:all: --no-deps
