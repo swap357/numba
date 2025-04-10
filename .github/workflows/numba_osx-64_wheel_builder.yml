@@ -100,15 +100,23 @@ jobs:
       - name: Build wheel
         run: python -m build
 
-      - name: Fix macOS wheel library paths
+      - name: Delocate wheel and adjust tags
         run: |
-          cd dist
-          curl https://gist.githubusercontent.com/sklam/15d98ca95047c68dc665affce6736ad1/raw/db5f7f9727918ca53599ea5ddccf0bda557e8153/patch_wheel_dylib.py > patch_wheel_dylib.py
-          chmod +x patch_wheel_dylib.py
-          python patch_wheel_dylib.py *.whl
-          ls -la ./*.whl
+          # Install necessary tools
+          pip install delocate wheel
+          
+          echo "--- Running delocate-wheel ---"
+          ls -l dist # Show files before
+          # Delocate bundles necessary libraries and fixes paths
+          delocate-wheel -v dist/*.whl
+          echo "--- Listing files after delocate ---"
+          ls -l dist/*.whl
+          
+          # Adjust platform tag as previously specified
           echo "--- Removing platform tag ---"
-          python -m wheel tags --remove --platform-tag=macosx_10_15_x86_64 ./numba*.whl
+          python -m wheel tags --remove --platform-tag=macosx_10_15_x86_64 dist/*.whl
+          echo "--- Listing files after tag removal ---"
+          ls -l dist/*.whl
 
       - name: Upload numba wheel
         uses: actions/upload-artifact@v4
