@@ -89,13 +89,7 @@ jobs:
 
       - name: Configure OpenMP for macOS
         run: |
-           # Install OpenMP via conda
            conda install --yes llvm-openmp
-
-           # Set minimal compiler and linker flags for OpenMP
-           echo "CFLAGS=-I$CONDA_PREFIX/include -Xclang -fopenmp" >> $GITHUB_ENV
-           echo "CXXFLAGS=-I$CONDA_PREFIX/include -Xclang -fopenmp" >> $GITHUB_ENV
-           echo "LDFLAGS=-L$CONDA_PREFIX/lib -lomp" >> $GITHUB_ENV
 
       - name: Build sdist [once - py3.10]
         if: matrix.python-version == '3.10'
@@ -299,9 +293,10 @@ jobs:
           ls -l unpacked_built/
           ls -l unpacked_public/
 
-      - name: Compare dylib linkages
+      - name: Compare Wheel Structures
         run: |
-          echo "--- Comparing dylib links --- "
+          echo "--- Comparing unpacked wheel directory structures and files ---"
+          # Find the top-level unpacked directories (handling version differences)
           built_dir=$(find unpacked_built -maxdepth 1 -type d -name 'numba*')
           public_dir=$(find unpacked_public -maxdepth 1 -type d -name 'numba*')
           
@@ -311,25 +306,8 @@ jobs:
             exit 1
           fi
           
-          echo "Comparing contents of $built_dir vs $public_dir"
-          cd "$built_dir"
-          
-          # Find dylibs relative to the unpacked numba directory
-          find . -name "*.dylib" | while read relative_dylib; do
-            relative_dylib=${relative_dylib#./}
-            built_dylib_full="$built_dir/$relative_dylib"
-            public_dylib_full="$public_dir/$relative_dylib"
-            
-            if [ -f "$public_dylib_full" ]; then
-              echo ""
-              echo "=== Comparing: $relative_dylib ==="
-              # Run diff, using labels and process substitution. Allow diff to return non-zero without failing the step.
-              diff --label "Built" <(otool -L "$built_dylib_full") --label "Public" <(otool -L "$public_dylib_full") || echo " Differences found for $relative_dylib"
-              echo "==============================="
-            else
-              echo ""
-              echo "INFO: Corresponding public dylib not found for $relative_dylib (Might be new in built wheel)"
-              echo "==============================="
-            fi
-          done
+          echo "Comparing $built_dir vs $public_dir"
+          # Use diff -qr to compare recursively and report only differences.
+          # Add || true so the step doesn't fail if differences are found.
+          diff -qr "$built_dir" "$public_dir" || true
           echo "Comparison finished."
