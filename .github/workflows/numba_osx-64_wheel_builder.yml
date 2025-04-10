@@ -111,6 +111,8 @@ jobs:
           chmod +x patch_wheel_dylib.py
           python patch_wheel_dylib.py *.whl
           ls -la ./*.whl
+          echo "--- Removing platform tag ---"
+          python -m wheel tags --remove --platform-tag=macosx_10_15_x86_64 ./numba*.whl
 
       - name: Upload numba wheel
         uses: actions/upload-artifact@v4
@@ -219,10 +221,20 @@ jobs:
           name: numba-osx-64-py${{ matrix.python-version }}-np${{ matrix.numpy_build }}
           path: dist
 
+      - name: Download llvmlite wheel
+        uses: actions/download-artifact@v4
+        with:
+          name: llvmlite-osx-64-py${{ matrix.python-version }}
+          path: llvmlite_wheels
+          run-id: ${{ inputs.llvmlite_wheel_runid }}
+          repository: numba/llvmlite
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Validate and smoke test wheel
         run: |
           python -m pip install --upgrade pip twine
           ls -l dist
+          python -m pip install llvmlite_wheels/*.whl
           python -m twine check dist/*.whl
           NUMPY_VERSION="${{ matrix.numpy_build }}"
           python -m pip install --extra-index-url https://pypi.anaconda.org/numba/label/wheels/simple dist/numba*.whl numpy==$NUMPY_VERSION
