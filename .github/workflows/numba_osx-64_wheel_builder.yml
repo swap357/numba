@@ -6,12 +6,8 @@ on:
     - .github/workflows/numba_osx-64_wheel_builder.yml
   workflow_dispatch:
     inputs:
-      llvmlite_conda_runid:
-        description: 'llvmlite conda workflow run ID for build(optional)'
-        required: false
-        type: string
       llvmlite_wheel_runid:
-        description: 'llvmlite wheel workflow run ID for tests(optional)'
+        description: 'llvmlite wheel workflow run ID (optional)'
         required: false
         type: string
 
@@ -21,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CONDA_CHANNEL_NUMBA: ad-testing/label/numpy2
+  NUMBA_CHANNEL: numba/label/osx-temp-wheel
   ARTIFACT_RETENTION_DAYS: 7
 
 jobs:
@@ -49,22 +45,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          conda-remove-defaults: true
-          auto-update-conda: true
-          auto-activate-base: true
 
-      - name: Download llvmlite Artifact
-        if: ${{ inputs.llvmlite_conda_runid != '' }}
+      - name: Download llvmlite wheel
         uses: actions/download-artifact@v4
         with:
           name: llvmlite-osx-64-py${{ matrix.python-version }}
-          path: llvmlite_conda
-          run-id: ${{ inputs.llvmlite_conda_runid }}
+          path: llvmlite_wheels
+          run-id: ${{ inputs.llvmlite_wheel_runid }}
           repository: numba/llvmlite
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -74,16 +65,14 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          if [ "${{ inputs.llvmlite_conda_runid }}" != "" ]; then
-              CHAN="file://${{ github.workspace }}/llvmlite_conda"
+          if [ "${{ inputs.llvmlite_wheel_runid }}" != "" ]; then
+              $PYTHON_PATH -m pip install llvmlite_wheels/*.whl
           else
-              CHAN="${{ env.CONDA_CHANNEL_NUMBA }}"
+              $PYTHON_PATH -m pip install -i ${{ env.NUMBA_CHANNEL }} llvmlite
           fi
 
           # Install llvmlite from the appropriate channel
-          conda install -c "$CHAN" --yes llvmlite 
-          conda install -c ${{ env.CONDA_CHANNEL_NUMBA }} --yes setuptools python-build numpy==${{ matrix.numpy_build }} clang_osx-64 clangxx_osx-64
-          conda install --yes llvm-openmp
+          $PYTHON_PATH -m pip install setuptools python-build numpy==${{ matrix.numpy_build }} clang_osx-64 clangxx_osx-64
 
       - name: Build sdist [once - py3.10]
         if: matrix.python-version == '3.10'
@@ -97,10 +86,9 @@ jobs:
 
       - name: Fix macOS wheel library paths
         run: |
+          chmod +x ./buildscripts/github/patch_wheel_dylib.py
+          python ./buildscripts/github/patch_wheel_dylib.py dist/*.whl
           cd dist
-          curl https://gist.githubusercontent.com/sklam/15d98ca95047c68dc665affce6736ad1/raw/db5f7f9727918ca53599ea5ddccf0bda557e8153/patch_wheel_dylib.py > patch_wheel_dylib.py
-          chmod +x patch_wheel_dylib.py
-          python patch_wheel_dylib.py *.whl
           ls -la ./*.whl
           echo "--- Removing platform tag ---"
           python -m wheel tags --remove --platform-tag=macosx_10_15_x86_64 ./numba*.whl
