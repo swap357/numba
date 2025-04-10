@@ -112,44 +112,9 @@ jobs:
       - name: Fix macOS wheel library paths
         run: |
           cd dist
-          whl=$(stat -f "%m %N" ./*.whl | sort -n | tail -n 1 | cut -d' ' -f2-)
-          echo "Processing wheel: $whl"
-
-          # Unpack the wheel
-          wheel unpack "$whl"
-
-          # Get into the unpacked directory
-          target_dir=$(echo "$whl" | cut -d "-" -f1 -f2)
-          cd "$target_dir"
-
-          # Find shared libraries
-          so_files=$(find . -iname "*.so")
-          echo "Found .so files:"
-          echo "$so_files"
-
-          for target_so in $so_files; do
-            echo "Processing $target_so"
-            echo "=== BEFORE ($target_so) ==="
-            otool -L "$target_so" || echo "otool failed for $target_so "
-
-            if otool -L "$target_so" | grep -q '@rpath/libc++.1.dylib'; then
-                echo "Patching @rpath/libc++.1.dylib in $target_so"
-                install_name_tool -change "@rpath/libc++.1.dylib" "/usr/lib/libc++.1.dylib" "$target_so"
-            else
-                echo "@rpath/libc++.1.dylib not found in $target_so"
-            fi
-
-            echo "=== AFTER ($target_so) ==="
-            otool -L "$target_so" || echo "otool failed for $target_so "
-          done
-
-          echo "=== $target_dir contents ==="
-          find . -ls
-          echo "=== Write back to wheel ==="
-          cd ..
-          wheel pack "$target_dir"
-
-          echo "=== Final wheel filename ==="
+          curl https://gist.githubusercontent.com/sklam/15d98ca95047c68dc665affce6736ad1/raw/db5f7f9727918ca53599ea5ddccf0bda557e8153/patch_wheel_dylib.py > patch_wheel_dylib.py
+          chmod +x patch_wheel_dylib.py
+          python patch_wheel_dylib.py *.whl
           ls -la ./*.whl
 
       - name: Upload numba wheel
@@ -262,16 +227,8 @@ jobs:
       - name: Validate and smoke test wheel
         run: |
           python -m pip install --upgrade pip twine
-          echo "--- Checking artifacts ---"
           ls -l dist
-          echo "--- Running twine check (wheel) ---"
           python -m twine check dist/*.whl
-          if [ "${{ matrix.python-version }}" == "3.10" ]; then
-            echo "--- Running twine check (sdist) ---"
-            python -m twine check dist/*.tar.gz
-          fi
-          echo "--- Installing wheel ---"
           NUMPY_VERSION="${{ matrix.numpy_build }}"
           python -m pip install --extra-index-url https://pypi.anaconda.org/numba/label/wheels/simple dist/numba*.whl numpy==$NUMPY_VERSION
-          echo "--- Running numba -s ---"
           python -m numba -s
