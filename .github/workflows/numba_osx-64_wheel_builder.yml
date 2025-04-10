@@ -19,8 +19,6 @@ concurrency:
 env:
   ARTIFACT_RETENTION_DAYS: 7
   TOKEN: ${{ secrets.ANACONDA_ORG_DOWNLOAD_TOKEN }}
-  MACOSX_DEPLOYMENT_TARGET: 10.10
-  SDKROOT: /opt/MacOSX10.10.sdk
 
 jobs:
   osx-64-build:
@@ -86,9 +84,15 @@ jobs:
 
       - name: Build sdist [once - py3.10]
         if: matrix.python-version == '3.10'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '10.10'
+          SDKROOT: /opt/MacOSX10.10.sdk
         run: $PYTHON_PATH -m build --sdist
 
       - name: Build wheel
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '10.10'
+          SDKROOT: /opt/MacOSX10.10.sdk
         run: $PYTHON_PATH -m build
 
       - name: Fix macOS wheel library paths
