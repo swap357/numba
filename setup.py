@@ -257,8 +257,8 @@ def get_ext_modules():
         
         # Apple clang doesn't support -fopenmp directly, use -Xclang approach
         # https://mac.r-project.org/openmp/
-        ompcompileflags = ['-Xclang', '-fopenmp']
-        omplinkflags = ['-lomp']
+        ompcompileflags = ['-fopenmp']
+        omplinkflags = ['-fopenmp=libiomp5']
         omppath = ['lib', 'clang', '*', 'include', 'omp.h']
         have_openmp = check_file_at_path(omppath)
     else:
