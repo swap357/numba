@@ -18,7 +18,6 @@ concurrency:
 
 env:
   ARTIFACT_RETENTION_DAYS: 7
-  TOKEN: ${{ secrets.ANACONDA_ORG_DOWNLOAD_TOKEN }}
 
 jobs:
   osx-64-build:
@@ -72,7 +71,7 @@ jobs:
           if [ "${{ inputs.llvmlite_wheel_runid }}" != "" ]; then
               $PYTHON_PATH -m pip install llvmlite_wheels/*.whl
           else
-              $PYTHON_PATH -m pip install -i https://pypi.anaconda.org/t/${{ env.TOKEN }}/numba/label/osx-temp-wheel/simple llvmlite
+              $PYTHON_PATH -m pip install -i https://pypi.anaconda.org/numba/label/osx-temp-wheel/simple llvmlite
           fi
 
           # Install other build dependencies via pip
@@ -163,7 +162,7 @@ jobs:
           if [ "${{ inputs.llvmlite_wheel_runid }}" != "" ]; then
               $PYTHON_PATH -m pip install llvmlite_wheels/*.whl
           else
-              $PYTHON_PATH -m pip install -i https://pypi.anaconda.org/t/${{ env.TOKEN }}/numba/label/osx-temp-wheel/simple llvmlite
+              $PYTHON_PATH -m pip install -i https://pypi.anaconda.org/numba/label/osx-temp-wheel/simple llvmlite
           fi
 
           $PYTHON_PATH -m twine check dist/*.whl
