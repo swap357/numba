@@ -17,8 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NUMBA_CHANNEL: numba/label/osx-temp-wheel
   ARTIFACT_RETENTION_DAYS: 7
+  TOKEN: ${{ secrets.ANACONDA_ORG_DOWNLOAD_TOKEN }}
 
 jobs:
   osx-64-build:
@@ -68,7 +68,7 @@ jobs:
           if [ "${{ inputs.llvmlite_wheel_runid }}" != "" ]; then
               $PYTHON_PATH -m pip install llvmlite_wheels/*.whl
           else
-              $PYTHON_PATH -m pip install -i ${{ env.NUMBA_CHANNEL }} llvmlite
+              $PYTHON_PATH -m pip install -i https://pypi.anaconda.org/t/${{ env.TOKEN }}/numba/label/osx-temp-wheel/simple llvmlite
           fi
 
           # Install llvmlite from the appropriate channel
@@ -115,7 +115,6 @@ jobs:
   osx-64-validate-wheel:
     name: osx-64-validate-wheel (py ${{ matrix.python-version }}, np ${{ matrix.numpy_build }})
     needs: osx-64-build
-    if: inputs.llvmlite_wheel_runid != ''
     runs-on: macos-13
     defaults:
       run:
@@ -155,11 +154,16 @@ jobs:
 
       - name: Validate and smoke test wheel
         run: |
-          # Get the Python executable path
           PYTHON_PATH=$(which python${{ matrix.python-version }})
           $PYTHON_PATH -m pip install --upgrade pip twine
           ls -l dist
-          $PYTHON_PATH -m pip install llvmlite_wheels/*.whl
+
+          if [ "${{ inputs.llvmlite_wheel_runid }}" != "" ]; then
+              $PYTHON_PATH -m pip install llvmlite_wheels/*.whl
+          else
+              $PYTHON_PATH -m pip install -i https://pypi.anaconda.org/t/${{ env.TOKEN }}/numba/label/osx-temp-wheel/simple llvmlite
+          fi
+
           $PYTHON_PATH -m twine check dist/*.whl
           NUMPY_VERSION="${{ matrix.numpy_build }}"
           $PYTHON_PATH -m pip install --extra-index-url https://pypi.anaconda.org/numba/label/wheels/simple dist/numba*.whl numpy==$NUMPY_VERSION
