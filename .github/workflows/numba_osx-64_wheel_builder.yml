@@ -145,6 +145,7 @@ jobs:
           path: dist
 
       - name: Download llvmlite wheel
+        if: inputs.llvmlite_wheel_runid != ''
         uses: actions/download-artifact@v4
         with:
           name: llvmlite-osx-64-py${{ matrix.python-version }}
