@@ -85,7 +85,7 @@ jobs:
           fi
 
           # Install llvmlite from the appropriate channel
-          conda install -c "$CHAN" --yes llvmlite setuptools python-build numpy==${{ matrix.numpy_build }}
+          conda install -c "$CHAN" --yes llvmlite setuptools python-build numpy==${{ matrix.numpy_build }} clang_osx-64 clangxx_osx-64
 
       - name: Configure OpenMP for macOS
         run: |
@@ -122,20 +122,25 @@ jobs:
           target_dir=$(echo "$whl" | cut -d "-" -f1 -f2)
           cd "$target_dir"
 
-          # Find ALL dylib files
-          dylib_files=$(find . -iname "*.dylib")
-          echo "Found dylib files:"
-          echo "$dylib_files"
+          # Find shared libraries
+          so_files=$(find . -iname "*.so")
+          echo "Found .so files:"
+          echo "$so_files"
 
-          for target_dylib in $dylib_files; do
-            echo "Processing $target_dylib"
-            echo "=== BEFORE ($target_dylib) ==="
-            otool -L "$target_dylib" || echo "otool failed for $target_dylib (might be expected for some files)"
+          for target_so in $so_files; do
+            echo "Processing $target_so"
+            echo "=== BEFORE ($target_so) ==="
+            otool -L "$target_so" || echo "otool failed for $target_so "
 
-            install_name_tool -change "@rpath/libc++.1.dylib" "/usr/lib/libc++.1.dylib" "$target_dylib"
+            if otool -L "$target_so" | grep -q '@rpath/libc++.1.dylib'; then
+                echo "Patching @rpath/libc++.1.dylib in $target_so"
+                install_name_tool -change "@rpath/libc++.1.dylib" "/usr/lib/libc++.1.dylib" "$target_so"
+            else
+                echo "@rpath/libc++.1.dylib not found in $target_so"
+            fi
 
-            echo "=== AFTER ($target_dylib) ==="
-            otool -L "$target_dylib" || echo "otool failed for $target_dylib (might be expected for some files)"
+            echo "=== AFTER ($target_so) ==="
+            otool -L "$target_so" || echo "otool failed for $target_so "
           done
 
           echo "=== $target_dir contents ==="
@@ -145,7 +150,7 @@ jobs:
           wheel pack "$target_dir"
 
           echo "=== Final wheel filename ==="
-          ls -la ./*.whl # List wheel in dist dir
+          ls -la ./*.whl
 
       - name: Upload numba wheel
         uses: actions/upload-artifact@v4
@@ -222,3 +227,51 @@ jobs:
 
           # Run tests
           $PYTHON_PATH -m numba.runtests -j 1:100 -v -m
+
+  osx-64-validate-wheel:
+    name: osx-64-validate-wheel (py ${{ matrix.python-version }}, np ${{ matrix.numpy_build }})
+    needs: osx-64-build
+    runs-on: macos-13
+    defaults:
+      run:
+        shell: bash -el {0}
+    strategy:
+      matrix:
+        include:
+          - python-version: "3.10"
+            numpy_build: "2.0.2"
+          - python-version: "3.11"
+            numpy_build: "2.0.2"
+          - python-version: "3.12"
+            numpy_build: "2.0.2"
+          - python-version: "3.13"
+            numpy_build: "2.1.3"
+      fail-fast: false
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download Numba wheel artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: numba-osx-64-py${{ matrix.python-version }}-np${{ matrix.numpy_build }}
+          path: dist
+
+      - name: Validate and smoke test wheel
+        run: |
+          python -m pip install --upgrade pip twine
+          echo "--- Checking artifacts ---"
+          ls -l dist
+          echo "--- Running twine check (wheel) ---"
+          python -m twine check dist/*.whl
+          if [ "${{ matrix.python-version }}" == "3.10" ]; then
+            echo "--- Running twine check (sdist) ---"
+            python -m twine check dist/*.tar.gz
+          fi
+          echo "--- Installing wheel ---"
+          NUMPY_VERSION="${{ matrix.numpy_build }}"
+          python -m pip install --extra-index-url https://pypi.anaconda.org/numba/label/wheels/simple dist/numba*.whl numpy==$NUMPY_VERSION
+          echo "--- Running numba -s ---"
+          python -m numba -s
