@@ -1,0 +1,65 @@
+name: Debug macOS Python Path
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/debug_macos_python_path.yml
+
+jobs:
+  check_python_path:
+    name: Check Python Path (py ${{ matrix.python-version }})
+    # Use the same runner as the original workflow, or macos-latest if you prefer
+    runs-on: macos-13
+    strategy:
+      matrix:
+        # Use a version likely different from the system default
+        python-version: ["3.11"]
+    defaults:
+      run:
+        # Use the same shell configuration as the original workflow
+        shell: bash -elx {0}
+
+    steps:
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        id: setup_python # Give it an id to potentially access outputs if needed
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Investigate Python Environment After Setup
+        run: |
+          echo "=================================================="
+          echo "               PYTHON PATH DEBUG                  "
+          echo "=================================================="
+          echo ">>> Running on Runner: $(uname -a)"
+          echo ">>> Requested Python Version: ${{ matrix.python-version }}"
+          echo ">>> Python Location from setup-python action: ${{ steps.setup_python.outputs.python-path }}" # Correct way to access output
+          echo "--------------------------------------------------"
+          echo "1. FULL PATH:"
+          echo "$PATH" | tr ':' '\n' # Print PATH entries one per line for clarity
+          echo "--------------------------------------------------"
+          echo "2. 'which python':"
+          which python || echo "WARN: 'python' command not found in PATH"
+          echo "--------------------------------------------------"
+          echo "3. 'python --version':"
+          python --version || echo "WARN: 'python --version' failed"
+          echo "--------------------------------------------------"
+          PY_SPECIFIC="python${{ matrix.python-version }}"
+          echo "4. 'which $PY_SPECIFIC':"
+          which $PY_SPECIFIC || echo "WARN: '$PY_SPECIFIC' command not found in PATH"
+          echo "--------------------------------------------------"
+          echo "5. '$PY_SPECIFIC --version':"
+          $PY_SPECIFIC --version || echo "WARN: '$PY_SPECIFIC --version' failed"
+          echo "=================================================="
+
+      - name: Check Python Version in Python Script
+        if: always() # Run even if previous steps failed slightly (e.g., command not found)
+        run: |
+          echo "--------------------------------------------------"
+          echo ">>> Checking Python version via inline script using 'python':"
+          python -c "import sys; print(sys.version); print('Executable:', sys.executable)" || echo "WARN: Failed using 'python'"
+          echo "--------------------------------------------------"
+          echo ">>> Checking Python version via inline script using '$PY_SPECIFIC':"
+          PY_SPECIFIC="python${{ matrix.python-version }}"
+          $PY_SPECIFIC -c "import sys; print(sys.version); print('Executable:', sys.executable)" || echo "WARN: Failed using '$PY_SPECIFIC'"
+          echo "==================================================" 
