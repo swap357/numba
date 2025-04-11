@@ -83,7 +83,6 @@ jobs:
       - name: Fix macOS wheel library paths
         run: |
           cd dist
-          chmod +x ../buildscripts/github/patch_wheel_dylib.py
           $PYTHON_PATH ../buildscripts/github/patch_wheel_dylib.py ./*.whl
           ls -la ./*.whl
 
@@ -164,3 +163,4 @@ jobs:
           NUMPY_VERSION="${{ matrix.numpy_build }}"
           $PYTHON_PATH -m pip install dist/numba*.whl numpy==$NUMPY_VERSION
           $PYTHON_PATH -m numba -s
+          $PYTHON_PATH -m numba.runtests -m 4 -j 1:100 -v
