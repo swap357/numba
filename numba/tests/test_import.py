@@ -24,14 +24,10 @@ class TestNumbaImport(TestCase):
                    'numba.core.typing.npdatetime',
                    ]
 
-        # On Python 3.12+, distutils is removed, don't check for it.
-        if utils.PYVERSION >= (3, 12):
-            banlist = [m for m in banlist if m != 'distutils']
-
         # Sanity check the modules still exist...
         for mod in banlist:
-            if mod not in ('cffi',):
-                __import__(mod)
+            if mod not in ('cffi',) and (mod != 'distutils' or utils.PYVERSION < (3, 12)):
+                 __import__(mod)
 
         code = """if 1:
             from numba import jit, vectorize
