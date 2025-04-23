@@ -66,6 +66,9 @@ jobs:
 
       - name: Install build dependencies
         run: |
+          # Install OpenMP via Homebrew
+          brew install libomp
+
           if [ "${{ inputs.llvmlite_wheel_runid }}" != "" ]; then
               $PYTHON_PATH -m pip install llvmlite_wheels/*.whl
           else
@@ -78,7 +81,11 @@ jobs:
         run: $PYTHON_PATH -m build --sdist
 
       - name: Build wheel
-        run: $PYTHON_PATH -m build
+        run: |
+          # Set OpenMP environment variables
+          export LDFLAGS="-L/usr/local/opt/libomp/lib"
+          export CPPFLAGS="-I/usr/local/opt/libomp/include"
+          $PYTHON_PATH -m build
 
       - name: Fix macOS wheel library paths
         run: |
