@@ -92,6 +92,8 @@ jobs:
           cd dist
           $PYTHON_PATH ../buildscripts/github/patch_wheel_dylib.py ./*.whl
           ls -la ./*.whl
+          # inspect the wheel
+          find . -name "*.so" -o -name "*.dylib" | xargs -I {} otool -L {}
 
       - name: Upload numba wheel
         uses: actions/upload-artifact@v4
