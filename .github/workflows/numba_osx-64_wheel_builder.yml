@@ -47,6 +47,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup platform-specific requirements
+        run: |
+          source ./buildscripts/github/setup_platform.sh "osx-64"
+
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
