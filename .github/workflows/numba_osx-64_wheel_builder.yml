@@ -46,13 +46,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Set Python Path
-        run: echo "PYTHON_PATH=$(which python${{ matrix.python-version }})" >> $GITHUB_ENV
+          conda-remove-defaults: true
+          auto-update-conda: true
+          auto-activate-base: true
   
       - name: Download llvmlite wheel
         if: inputs.llvmlite_wheel_runid != ''
@@ -66,31 +66,25 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          # Install OpenMP via Homebrew
-          brew install libomp
-
-          if [ "${{ inputs.llvmlite_wheel_runid }}" != "" ]; then
-              $PYTHON_PATH -m pip install llvmlite_wheels/*.whl
+          if [ "${{ inputs.llvmlite_conda_runid }}" != "" ]; then
+              CHAN="file:///${{ env.LOCAL_LLVMLITE_ARTIFACT_PATH }}"
           else
-              $PYTHON_PATH -m pip install -i $WHEELS_INDEX_URL llvmlite
+              CHAN="${{ env.CONDA_CHANNEL_NUMBA }}"
           fi
-          $PYTHON_PATH -m pip install setuptools build numpy==${{ matrix.numpy_build }} wheel
+          conda install -c "$CHAN" llvmlite setuptools build numpy==${{ matrix.numpy_build }}
+          conda install --yes llvm-openmp
 
       - name: Build sdist [once - py3.10]
         if: matrix.python-version == '3.10'
-        run: $PYTHON_PATH -m build --sdist
+        run: python -m build --sdist
 
       - name: Build wheel
-        run: |
-          # Set OpenMP environment variables
-          export LDFLAGS="-L/usr/local/opt/libomp/lib"
-          export CPPFLAGS="-I/usr/local/opt/libomp/include"
-          $PYTHON_PATH -m build
+        run: python -m build
 
       - name: Fix macOS wheel library paths
         run: |
           cd dist
-          $PYTHON_PATH ../buildscripts/github/patch_wheel_dylib.py ./*.whl
+          python ../buildscripts/github/patch_wheel_dylib.py ./*.whl
           ls -la ./*.whl
           # inspect the wheel
           find . -name "*.so" -o -name "*.dylib" | xargs -I {} otool -L {}
