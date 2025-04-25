@@ -19,6 +19,7 @@ concurrency:
 env:
   ARTIFACT_RETENTION_DAYS: 7
   WHEELS_INDEX_URL: https://pypi.anaconda.org/numba/label/dev/simple
+  CONDA_CHANNEL_NUMBA: numba/label/dev
 
 jobs:
   osx-64-build:
@@ -66,12 +67,12 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          if [ "${{ inputs.llvmlite_conda_runid }}" != "" ]; then
-              CHAN="file:///${{ env.LOCAL_LLVMLITE_ARTIFACT_PATH }}"
+          if [ "${{ inputs.llvmlite_wheel_runid }}" != "" ]; then
+              python -m pip install llvmlite_wheels/*.whl
           else
-              CHAN="${{ env.CONDA_CHANNEL_NUMBA }}"
+              conda install -c ${{ env.CONDA_CHANNEL_NUMBA }} llvmlite
           fi
-          conda install -c "$CHAN" llvmlite setuptools build numpy==${{ matrix.numpy_build }}
+          conda install -c ${{ env.CONDA_CHANNEL_NUMBA }} python-build numpy==${{ matrix.numpy_build }}
           conda install --yes llvm-openmp
 
       - name: Build sdist [once - py3.10]
