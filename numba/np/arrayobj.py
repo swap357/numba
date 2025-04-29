@@ -2403,7 +2403,12 @@ def np_clip(a, a_min, a_max, out=None):
             # a_min and a_max are scalars
             # since their shape will be empty
             # so broadcasting is not needed at all
-            ret = np.empty_like(a) if out is None else out
+            if isinstance(a_min, float) or isinstance(a_max, float):
+                result_dtype = np.dtype('float64')
+            else:
+                result_dtype = a.dtype
+
+            ret = np.empty_like(a, dtype=result_dtype) if out is None else out
             for index in np.ndindex(a.shape):
                 val_a = a[index]
                 ret[index] = min(max(val_a, a_min), a_max)

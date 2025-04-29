@@ -1805,6 +1805,41 @@ class TestArrayMethods(MemoryLeakMixin, TestCase):
         args = n, np.dtype('f4')
         np.testing.assert_array_equal(pyfunc(*args), cfunc(*args))
 
+    def test_clip_dtype_promotion(self):
+        """Test that clip properly handles dtype promotion with NaN/Inf."""
+        pyfunc = np_clip_no_out
+        cfunc = jit(nopython=True)(pyfunc)
+
+        # Test int array with NaN bounds (should result in float array)
+        a = np.array([1, 2, 5, 10, 15], dtype=np.int64)
+        expect = pyfunc(a, np.nan, np.nan)
+        got = cfunc(a, np.nan, np.nan)
+        # Check dtype matches NumPy's result
+        self.assertEqual(got.dtype, expect.dtype)
+
+        # Test int array with inf bounds
+        expect = pyfunc(a, -np.inf, np.inf)
+        got = cfunc(a, -np.inf, np.inf)
+        self.assertEqual(got.dtype, expect.dtype)
+        np.testing.assert_array_equal(got, expect)
+
+    def test_array_clip_dtype_promotion(self):
+        """Test that array.clip properly handles dtype promotion with NaN/Inf."""
+        pyfunc = array_clip_no_out
+        cfunc = jit(nopython=True)(pyfunc)
+
+        # Test int array with NaN bounds
+        a = np.array([1, 2, 5, 10, 15], dtype=np.int64)
+        expect = pyfunc(a, np.nan, np.nan)
+        got = cfunc(a, np.nan, np.nan)
+        self.assertEqual(got.dtype, expect.dtype)
+
+        # Test int array with inf bounds
+        expect = pyfunc(a, -np.inf, np.inf)
+        got = cfunc(a, -np.inf, np.inf)
+        self.assertEqual(got.dtype, expect.dtype)
+        np.testing.assert_array_equal(got, expect)
+
 class TestArrayComparisons(TestCase):
 
     def test_identity(self):
