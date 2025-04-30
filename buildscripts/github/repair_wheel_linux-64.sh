@@ -8,6 +8,11 @@ PYTHON_TAG=$1
 USE_TBB=${2:-"true"}
 WHEEL_DIR=${3:-"/io/wheelhouse"}
 
+# Debug output
+echo "PYTHON_TAG: $PYTHON_TAG"
+echo "USE_TBB: $USE_TBB"
+echo "WHEEL_DIR: $WHEEL_DIR"
+
 # Set Python path
 PYTHON_PATH=/opt/python/${PYTHON_TAG}-${PYTHON_TAG}/bin/python
 
@@ -45,7 +50,7 @@ WHEEL_PATCHED=$(ls -1 *.whl | head -1)
 
 # Unpack the wheel for patching
 $PYTHON_PATH -m wheel unpack $WHEEL_PATCHED
-WHEEL_DIR_UNPACKED=$(find . -maxdepth 1 -type d -name "numba-*" | head -n 1)
+WHEEL_DIR_UNPACKED=$(find . -maxdepth 1 -type d -name "numba-*" | head -1)
 cd "$WHEEL_DIR_UNPACKED"
 
 # Patch libraries
@@ -58,6 +63,7 @@ if [ -d "numba.libs" ]; then
 
   # Patch TBB libraries if present and TBB is enabled
   if [ "$USE_TBB" = "true" ] && [ -n "$LIBTBB" ]; then
+    echo "Patching TBB libraries"
     TBBEXT=$(echo "$LIBTBB" | grep -oP "(\\.so.*)" || echo ".so")
     patchelf numba/np/ufunc/tbbpool*.so --replace-needed $LIBTBB libtbb$TBBEXT
     patchelf numba/np/ufunc/tbbpool*.so --remove-rpath
@@ -67,6 +73,7 @@ if [ -d "numba.libs" ]; then
 
   # Patch OpenMP libraries if present
   if [ -n "$LIBOMP" ]; then
+    echo "Patching OpenMP libraries"
     OMPEXT=$(echo "$LIBOMP" | grep -oP "(\\.so.*)" || echo ".so")
     patchelf numba/np/ufunc/omppool*.so --replace-needed $LIBOMP libgomp$OMPEXT
     patchelf numba/np/ufunc/omppool*.so --remove-rpath
@@ -88,10 +95,17 @@ $PYTHON_PATH -m wheel pack "$WHEEL_DIR_UNPACKED"
 
 # Add -tbb suffix if TBB is enabled
 if [ "$USE_TBB" = "true" ]; then
+  echo "Adding TBB suffix to wheel"
   WHEEL_NAME=$(ls numba-*.whl)
   NEW_WHEEL_NAME=${WHEEL_NAME/.whl/-tbb.whl}
   mv "$WHEEL_NAME" "$NEW_WHEEL_NAME"
+  echo "Renamed wheel to: $NEW_WHEEL_NAME"
+else
+  echo "Not adding TBB suffix (USE_TBB=$USE_TBB)"
 fi
+
+# Clean the original wheel directory (remove the original wheel)
+rm -f $WHEEL_DIR/numba*-linux_x86_64.whl
 
 # Move repaired wheel back to output directory
 cp *.whl $WHEEL_DIR/

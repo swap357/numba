@@ -25,7 +25,8 @@ env:
   ARTIFACT_RETENTION_DAYS: 7
   WHEELS_INDEX_URL: https://pypi.anaconda.org/numba/label/dev/simple
   CONDA_CHANNEL_NUMBA: numba/label/dev
-  USE_TBB: ${{ inputs.use_tbb != false }}
+  # Set USE_TBB to true by default, only override if explicitly set to false
+  USE_TBB: ${{ github.event_name == 'workflow_dispatch' && inputs.use_tbb != false || true }}
 
 jobs:
   linux-64-build:
@@ -82,7 +83,7 @@ jobs:
             /io/buildscripts/github/build_wheel_linux-64.sh \
             ${{ matrix.python_tag }} \
             ${{ matrix.numpy_build }} \
-            $USE_TBB \
+            "$USE_TBB" \
             "/io/llvmlite_wheels" \
             "$WHEELS_INDEX_URL"
 
@@ -97,7 +98,8 @@ jobs:
             quay.io/pypa/manylinux2014_x86_64 \
             /io/buildscripts/github/repair_wheel_linux-64.sh \
             ${{ matrix.python_tag }} \
-            $USE_TBB
+            "$USE_TBB" \
+            "/io/wheelhouse"
 
           # List repaired wheels
           ls -la wheelhouse/
