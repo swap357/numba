@@ -14,9 +14,15 @@ PYTHON_PATH=/opt/python/${PYTHON_TAG}-${PYTHON_TAG}/bin/python
 # Install required tools
 $PYTHON_PATH -m pip install auditwheel patchelf twine wheel
 
+# Make sure the wheelhouse directory exists
+mkdir -p $WHEEL_DIR
+
 # Find the wheel
 cd $WHEEL_DIR
-WHEEL_FILE=$(ls -1 numba*.whl | head -1)
+echo "Contents of wheel directory ($WHEEL_DIR):"
+ls -la
+
+WHEEL_FILE=$(ls -1 numba*.whl 2>/dev/null | head -1)
 
 if [ -z "$WHEEL_FILE" ]; then
     echo "No wheel file found in $WHEEL_DIR"
@@ -25,8 +31,13 @@ fi
 
 echo "Repairing wheel: $WHEEL_FILE"
 
+# Create a temporary directory for repair
+REPAIR_DIR=$(mktemp -d)
+cp "$WHEEL_FILE" "$REPAIR_DIR/"
+cd "$REPAIR_DIR"
+
 # Repair with auditwheel
-$PYTHON_PATH -m auditwheel repair $WHEEL_FILE
+$PYTHON_PATH -m auditwheel repair "$WHEEL_FILE"
 cd wheelhouse
 
 # Get the filename of the wheel to be patched

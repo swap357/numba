@@ -28,13 +28,23 @@ else
     $PYTHON_PATH -m pip install -i $WHEELS_INDEX_URL llvmlite
 fi
 
-# Build wheel
+# Change to the mounted workspace directory
+cd /io
+
+# Show directory contents for debugging
+echo "Contents of /io directory:"
+ls -la
+
+# Build wheel from the workspace directory
 $PYTHON_PATH -m build --wheel
 
 # Build sdist based on python version (3.10)
 if [ "$PYTHON_TAG" = "cp310" ]; then
     $PYTHON_PATH -m build --sdist
 fi
+
+# Create output directory if it doesn't exist
+mkdir -p /io/wheelhouse
 
 # Copy wheel to the output directory
 cp dist/*.whl /io/wheelhouse/
