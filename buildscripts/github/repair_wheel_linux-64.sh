@@ -93,17 +93,6 @@ cd ..
 rm -f *.whl
 $PYTHON_PATH -m wheel pack "$WHEEL_DIR_UNPACKED"
 
-# Add -tbb suffix if TBB is enabled
-if [ "$USE_TBB" = "true" ]; then
-  echo "Adding TBB suffix to wheel"
-  WHEEL_NAME=$(ls numba-*.whl)
-  NEW_WHEEL_NAME=${WHEEL_NAME/.whl/-tbb.whl}
-  mv "$WHEEL_NAME" "$NEW_WHEEL_NAME"
-  echo "Renamed wheel to: $NEW_WHEEL_NAME"
-else
-  echo "Not adding TBB suffix (USE_TBB=$USE_TBB)"
-fi
-
 # Clean the original wheel directory (remove the original wheel)
 rm -f $WHEEL_DIR/numba*-linux_x86_64.whl
 
