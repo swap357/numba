@@ -31,8 +31,6 @@ jobs:
   linux-64-build:
     name: linux-64-build-wheel (py ${{ matrix.python-version }}, np ${{ matrix.numpy_build }})
     runs-on: ubuntu-latest
-    container:
-      image: quay.io/pypa/manylinux2014_x86_64
     defaults:
       run:
         shell: bash -elx {0}
@@ -69,55 +67,40 @@ jobs:
           repository: numba/llvmlite
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set Python Path
+      - name: Prepare build environment
         run: |
-          PYTHON_PATH=/opt/python/${{ matrix.python_tag }}-${{ matrix.python_tag }}/bin/python
-          echo "PYTHON_PATH=$PYTHON_PATH" >> $GITHUB_ENV
-          $PYTHON_PATH --version
+          mkdir -p dist wheelhouse
+          chmod +x buildscripts/github/build_wheel_linux-64.sh
+          chmod +x buildscripts/github/repair_wheel_linux-64.sh
 
-      - name: Install dependencies
+      - name: Build wheel in Docker
         run: |
-          $PYTHON_PATH -m pip install --upgrade pip setuptools wheel
-          $PYTHON_PATH -m pip install build numpy==${{ matrix.numpy_build }} auditwheel setuptools wheel patchelf twine
-          
-          # Install TBB if enabled
-          if [ "$USE_TBB" = "true" ]; then
-              $PYTHON_PATH -m pip install tbb==2021.6 tbb-devel==2021.6
-          fi
-          
-          # Install llvmlite
-          if [ -d 'llvmlite_wheels' ] && [ "${{ inputs.llvmlite_wheel_runid }}" != "" ]; then
-              $PYTHON_PATH -m pip install llvmlite_wheels/*.whl
-          else
-              $PYTHON_PATH -m pip install -i $WHEELS_INDEX_URL llvmlite
-          fi
+          # Run the build script in Docker
+          docker run --rm \
+            -v ${{ github.workspace }}:/io \
+            quay.io/pypa/manylinux2014_x86_64 \
+            /io/buildscripts/github/build_wheel_linux-64.sh \
+            ${{ matrix.python_tag }} \
+            ${{ matrix.numpy_build }} \
+            $USE_TBB \
+            "/io/llvmlite_wheels" \
+            "$WHEELS_INDEX_URL"
 
-      - name: Build sdist [once - py3.10]
-        if: matrix.python-version == '3.10'
-        run: $PYTHON_PATH -m build --sdist
+          # List built wheels
+          ls -la wheelhouse/
 
-      - name: Build wheel
-        run: $PYTHON_PATH -m build
-
-      - name: Fix linux wheel with auditwheel
+      - name: Repair and patch wheel in Docker
         run: |
-          cd dist
-          # Repair with auditwheel
-          $PYTHON_PATH -m auditwheel repair *.whl
-          
-          # Run wheel patching script
-          cd wheelhouse
-          chmod +x $GITHUB_WORKSPACE/buildscripts/github/patch_wheel_linux-64.sh
-          $GITHUB_WORKSPACE/buildscripts/github/patch_wheel_linux-64.sh $(ls -1 *.whl | head -1) $PYTHON_PATH $USE_TBB
-          
-          # List all wheels
-          ls -la
-          
-          # Move wheel back to dist
-          cd ..
-          mkdir -p ../wheelhouse
-          cp wheelhouse/*.whl ../wheelhouse/
-          cp wheelhouse/*.whl .
+          # Run the repair script in Docker
+          docker run --rm \
+            -v ${{ github.workspace }}:/io \
+            quay.io/pypa/manylinux2014_x86_64 \
+            /io/buildscripts/github/repair_wheel_linux-64.sh \
+            ${{ matrix.python_tag }} \
+            $USE_TBB
+
+          # List repaired wheels
+          ls -la wheelhouse/
 
       - name: Upload numba wheel
         uses: actions/upload-artifact@v4

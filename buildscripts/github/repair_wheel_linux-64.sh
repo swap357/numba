@@ -1,22 +1,43 @@
 #!/bin/bash
 set -ex
 
-# This script patches a Numba wheel to fix library dependencies
-# Usage: patch_wheel_linux-64.sh <wheel_path> <python_path> <use_tbb>
+# Repairs and patches a Numba wheel inside the manylinux container
+# Usage: repair_wheel_linux-64.sh <python_tag> <use_tbb>
 
-WHEEL_PATH=$1
-PYTHON_PATH=$2
-USE_TBB=${3:-"true"}
+PYTHON_TAG=$1
+USE_TBB=${2:-"true"}
+WHEEL_DIR=${3:-"/io/wheelhouse"}
 
-WHEEL_DIR=$(dirname "$WHEEL_PATH")
-cd "$WHEEL_DIR"
+# Set Python path
+PYTHON_PATH=/opt/python/${PYTHON_TAG}-${PYTHON_TAG}/bin/python
 
-# Unpack the wheel
-WHEEL_FILENAME=$(basename "$WHEEL_PATH")
-$PYTHON_PATH -m wheel unpack "$WHEEL_FILENAME"
+# Install required tools
+$PYTHON_PATH -m pip install auditwheel patchelf twine wheel
+
+# Find the wheel
+cd $WHEEL_DIR
+WHEEL_FILE=$(ls -1 numba*.whl | head -1)
+
+if [ -z "$WHEEL_FILE" ]; then
+    echo "No wheel file found in $WHEEL_DIR"
+    exit 1
+fi
+
+echo "Repairing wheel: $WHEEL_FILE"
+
+# Repair with auditwheel
+$PYTHON_PATH -m auditwheel repair $WHEEL_FILE
+cd wheelhouse
+
+# Get the filename of the wheel to be patched
+WHEEL_PATCHED=$(ls -1 *.whl | head -1)
+
+# Unpack the wheel for patching
+$PYTHON_PATH -m wheel unpack $WHEEL_PATCHED
 WHEEL_DIR_UNPACKED=$(find . -maxdepth 1 -type d -name "numba-*" | head -n 1)
 cd "$WHEEL_DIR_UNPACKED"
 
+# Patch libraries
 if [ -d "numba.libs" ]; then
   cd numba.libs
   LIBTBB=$(ls libtbb* 2>/dev/null || echo "")
@@ -61,8 +82,10 @@ if [ "$USE_TBB" = "true" ]; then
   mv "$WHEEL_NAME" "$NEW_WHEEL_NAME"
 fi
 
-# Move the wheel back to the original location
-FINAL_WHEEL=$(ls numba-*.whl)
-mv "$FINAL_WHEEL" "$WHEEL_DIR/../"
+# Move repaired wheel back to output directory
+cp *.whl $WHEEL_DIR/
 
-echo "Wheel patching completed: $FINAL_WHEEL" 
+# Verify wheel
+$PYTHON_PATH -m twine check *.whl
+
+echo "Wheel repair and patch completed successfully" 
