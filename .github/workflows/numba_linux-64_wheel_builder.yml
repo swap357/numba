@@ -97,7 +97,7 @@ jobs:
       - name: Fix linux wheel with auditwheel
         run: |
           cd dist
-          LD_LIBRARY_PATH=$(dirname $PYTHON_PATH)/lib:$LD_LIBRARY_PATH $PYTHON_PATH -m auditwheel repair ./*.whl
+          LD_LIBRARY_PATH=$(dirname $PYTHON_PATH)/lib:$LD_LIBRARY_PATH $PYTHON_PATH -m auditwheel repair --plat manylinux_2_17_x86_64 ./*.whl
           cd wheelhouse
           ls -la
 
