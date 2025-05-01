@@ -1814,8 +1814,9 @@ class TestArrayMethods(MemoryLeakMixin, TestCase):
         a = np.array([1, 2, 5, 10, 15], dtype=np.int64)
         expect = pyfunc(a, np.nan, np.nan)
         got = cfunc(a, np.nan, np.nan)
-        # Check dtype matches NumPy's result
         self.assertEqual(got.dtype, expect.dtype)
+        np.testing.assert_array_equal(got, expect)
+
 
         # Test int array with inf bounds
         expect = pyfunc(a, -np.inf, np.inf)
