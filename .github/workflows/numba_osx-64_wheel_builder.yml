@@ -170,8 +170,16 @@ jobs:
           fi
           $PYTHON_PATH -m twine check dist/*.whl
           $PYTHON_PATH -m pip install dist/numba*.whl numpy==${{ matrix.numpy_build }} intel-openmp
+          
+          # Debug: Show intel-openmp installation details
+          $PYTHON_PATH -m pip show -f intel-openmp
 
-          # Export DYLD_FALLBACK_LIBRARY_PATH
-          export DYLD_FALLBACK_LIBRARY_PATH=$($PYTHON_PATH -c "import intel_openmp, os; print(os.path.join(os.path.dirname(intel_openmp.__file__), 'lib'))")
+          find /usr/lib -name "*omp*" || echo "No omp files found in /usr/lib"
 
+          # Calculate and set DYLD_FALLBACK_LIBRARY_PATH
+          INTEL_OMP_LIB_PATH=$($PYTHON_PATH -c "import intel_openmp, os; print(os.path.join(os.path.dirname(intel_openmp.__file__), 'lib'))")
+          echo "DYLD_FALLBACK_LIBRARY_PATH=$INTEL_OMP_LIB_PATH" >> $GITHUB_ENV
+          echo "Calculated DYLD_FALLBACK_LIBRARY_PATH: $INTEL_OMP_LIB_PATH"
+
+          # print Numba system information
           $PYTHON_PATH -m numba -s
