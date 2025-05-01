@@ -174,5 +174,3 @@ jobs:
           export DYLD_FALLBACK_LIBRARY_PATH=$(python -c "import intel_openmp, os; print(os.path.join(os.path.dirname(intel_openmp.__file__), 'lib'))")
           # print Numba system information
           $PYTHON_PATH -m numba -s
-          # run tests
-          # $PYTHON_PATH -m numba.runtests -m 4 -v
