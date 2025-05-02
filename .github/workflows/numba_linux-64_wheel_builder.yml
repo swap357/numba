@@ -68,23 +68,25 @@ jobs:
           repository: numba/llvmlite
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Prepare build environment
-        run: |
-          mkdir -p dist wheelhouse
-          chmod +x buildscripts/github/build_wheel_linux-64.sh
-          chmod +x buildscripts/github/repair_wheel_linux-64.sh
-
       - name: Build wheel in Docker
         run: |
           # Construct the expected Python executable path inside the container
           PYTHON_EXECUTABLE="/opt/python/${{ matrix.python_tag }}-${{ matrix.python_tag }}/bin/python"
           echo "Using Python executable: $PYTHON_EXECUTABLE"
 
-          # Run the build script in Docker
+          mkdir -p dist wheelhouse
+
+          # Run git config and the build script inside Docker container
           docker run --rm \
             -v ${{ github.workspace }}:/io \
             quay.io/pypa/manylinux2014_x86_64 \
-            /io/buildscripts/github/build_wheel_linux-64.sh \
+            bash -c '
+              set -ex
+              echo "Setting Git safe directory: /io"
+              git config --global --add safe.directory /io
+              echo "Executing build script: /io/buildscripts/github/build_wheel_linux-64.sh"
+              /io/buildscripts/github/build_wheel_linux-64.sh "$0" "$1" "$2" "$3" "$4"
+            ' -- \
             "$PYTHON_EXECUTABLE" \
             "$USE_TBB" \
             ${{ matrix.numpy_build }} \
