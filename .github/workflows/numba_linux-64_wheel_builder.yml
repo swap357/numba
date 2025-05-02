@@ -76,14 +76,18 @@ jobs:
 
       - name: Build wheel in Docker
         run: |
+          # Construct the expected Python executable path inside the container
+          PYTHON_EXECUTABLE="/opt/python/${{ matrix.python_tag }}-${{ matrix.python_tag }}/bin/python"
+          echo "Using Python executable: $PYTHON_EXECUTABLE"
+
           # Run the build script in Docker
           docker run --rm \
             -v ${{ github.workspace }}:/io \
             quay.io/pypa/manylinux2014_x86_64 \
             /io/buildscripts/github/build_wheel_linux-64.sh \
-            ${{ matrix.python_tag }} \
-            ${{ matrix.numpy_build }} \
+            "$PYTHON_EXECUTABLE" \
             "$USE_TBB" \
+            ${{ matrix.numpy_build }} \
             "/io/llvmlite_wheels" \
             "$WHEELS_INDEX_URL"
 
@@ -92,12 +96,16 @@ jobs:
 
       - name: Repair and patch wheel in Docker
         run: |
+          # Construct the expected Python executable path inside the container
+          PYTHON_EXECUTABLE="/opt/python/${{ matrix.python_tag }}-${{ matrix.python_tag }}/bin/python"
+          echo "Using Python executable: $PYTHON_EXECUTABLE"
+
           # Run the repair script in Docker
           docker run --rm \
             -v ${{ github.workspace }}:/io \
             quay.io/pypa/manylinux2014_x86_64 \
             /io/buildscripts/github/repair_wheel_linux-64.sh \
-            ${{ matrix.python_tag }} \
+            "$PYTHON_EXECUTABLE" \
             "$USE_TBB" \
             "/io/wheelhouse"
 
@@ -177,9 +185,9 @@ jobs:
           fi
           $PYTHON_PATH -m twine check dist/*.whl
           $PYTHON_PATH -m pip install dist/numba*.whl numpy==${{ matrix.numpy_build }}
-          
+
           # print Numba system information
           $PYTHON_PATH -m numba -s
-          
+
           # run tests
           $PYTHON_PATH -m numba.runtests -m 4 -v

@@ -2,22 +2,19 @@
 set -ex
 
 # Repairs and patches a Numba wheel inside the manylinux container
-# Usage: repair_wheel_linux-64.sh <python_tag> <use_tbb>
+# Usage: repair_wheel_linux-64.sh <python_executable> <use_tbb> <wheel_dir>
 
-PYTHON_TAG=$1
+PYTHON_EXECUTABLE=$1 # Use the provided executable path
 USE_TBB=${2:-"true"}
 WHEEL_DIR=${3:-"/io/wheelhouse"}
 
 # Debug output
-echo "PYTHON_TAG: $PYTHON_TAG"
+echo "PYTHON_EXECUTABLE: $PYTHON_EXECUTABLE"
 echo "USE_TBB: $USE_TBB"
 echo "WHEEL_DIR: $WHEEL_DIR"
 
-# Set Python path
-PYTHON_PATH=/opt/python/${PYTHON_TAG}-${PYTHON_TAG}/bin/python
-
 # Install required tools
-$PYTHON_PATH -m pip install auditwheel patchelf twine wheel
+$PYTHON_EXECUTABLE -m pip install auditwheel patchelf twine wheel
 
 # Make sure the wheelhouse directory exists
 mkdir -p $WHEEL_DIR
@@ -42,14 +39,14 @@ cp "$WHEEL_FILE" "$REPAIR_DIR/"
 cd "$REPAIR_DIR"
 
 # Repair with auditwheel
-$PYTHON_PATH -m auditwheel repair "$WHEEL_FILE"
-cd wheelhouse
+$PYTHON_EXECUTABLE -m auditwheel repair "$WHEEL_FILE" -w "$REPAIR_DIR/wheelhouse"
+cd "$REPAIR_DIR/wheelhouse"
 
 # Get the filename of the wheel to be patched
 WHEEL_PATCHED=$(ls -1 *.whl | head -1)
 
 # Unpack the wheel for patching
-$PYTHON_PATH -m wheel unpack $WHEEL_PATCHED
+$PYTHON_EXECUTABLE -m wheel unpack $WHEEL_PATCHED
 WHEEL_DIR_UNPACKED=$(find . -maxdepth 1 -type d -name "numba-*" | head -1)
 cd "$WHEEL_DIR_UNPACKED"
 
@@ -91,15 +88,20 @@ cd ..
 
 # Repack the wheel
 rm -f *.whl
-$PYTHON_PATH -m wheel pack "$WHEEL_DIR_UNPACKED"
+$PYTHON_EXECUTABLE -m wheel pack "$WHEEL_DIR_UNPACKED"
 
-# Clean the original wheel directory (remove the original wheel)
-rm -f $WHEEL_DIR/numba*-linux_x86_64.whl
+# Get the filename of the final repacked wheel
+WHEEL_REPACKED=$(ls -1 *.whl | head -1)
 
-# Move repaired wheel back to output directory
-cp *.whl $WHEEL_DIR/
+# Remove the original non-manylinux wheel from the target directory
+echo "Removing original wheel: $WHEEL_DIR/$WHEEL_FILE"
+rm -f "$WHEEL_DIR/$WHEEL_FILE"
 
-# Verify wheel
-$PYTHON_PATH -m twine check *.whl
+# Move final (repaired and repacked) wheel back to output directory
+echo "Copying final wheel $WHEEL_REPACKED to $WHEEL_DIR/"
+cp "$WHEEL_REPACKED" "$WHEEL_DIR/"
 
-echo "Wheel repair and patch completed successfully" 
+# Verify the final wheel (in the temp dir before cleanup)
+$PYTHON_EXECUTABLE -m twine check "$WHEEL_REPACKED"
+
+echo "Wheel repair and patch completed successfully"
