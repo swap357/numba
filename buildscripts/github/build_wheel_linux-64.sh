@@ -10,6 +10,9 @@ NUMPY_VERSION=$3 # Adjusted index
 LLVMLITE_WHEEL_PATH=${4:-""} # Adjusted index
 WHEELS_INDEX_URL=${5:-"https://pypi.anaconda.org/numba/label/dev/simple"} # Adjusted index
 
+# Set Git safe directory (needed for setuptools-scm in Docker)
+git config --global --add safe.directory /io
+
 # Install dependencies
 $PYTHON_EXECUTABLE -m pip install build numpy==${NUMPY_VERSION} setuptools wheel
 

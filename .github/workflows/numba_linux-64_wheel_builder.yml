@@ -79,20 +79,16 @@ jobs:
           chmod +x buildscripts/github/build_wheel_linux-64.sh
           chmod +x buildscripts/github/repair_wheel_linux-64.sh
 
-          # Run git config and the build script inside Docker container
+          # Run the build script inside Docker container
           docker run --rm \
             -v ${{ github.workspace }}:/io \
             quay.io/pypa/manylinux2014_x86_64 \
-            bash -c ' \
-              set -ex; \
-              git config --global --add safe.directory /io; \
-              /io/buildscripts/github/build_wheel_linux-64.sh "$0" "$1" "$2" "$3" "$4"; \
-            ' -- \
-            "$PYTHON_EXECUTABLE" \
-            "$USE_TBB" \
+            /io/buildscripts/github/build_wheel_linux-64.sh \
+            "${PYTHON_EXECUTABLE}" \
+            "${USE_TBB}" \
             "${{ matrix.numpy_build }}" \
             "/io/llvmlite_wheels" \
-            "$WHEELS_INDEX_URL"
+            "${WHEELS_INDEX_URL}"
 
           # List built wheels
           ls -la wheelhouse/
