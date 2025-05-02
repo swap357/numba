@@ -68,7 +68,7 @@ jobs:
           repository: numba/llvmlite
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build wheel in Docker
+      - name: Build wheel in manylinux docker container
         run: |
           # Construct the expected Python executable path inside the container
           PYTHON_EXECUTABLE="/opt/python/${{ matrix.python_tag }}-${{ matrix.python_tag }}/bin/python"
@@ -86,9 +86,8 @@ jobs:
             bash -c ' \
               set -ex; \
               git config --global --add safe.directory /io; \
-              /io/buildscripts/github/build_wheel_linux-64.sh "$1" "$2" "$3" "$4" "$5"; \
+              /io/buildscripts/github/build_wheel_linux-64.sh "$0" "$1" "$2" "$3" "$4"; \
             ' -- \
-            "bash" \
             "$PYTHON_EXECUTABLE" \
             "$USE_TBB" \
             "${{ matrix.numpy_build }}" \
@@ -98,7 +97,7 @@ jobs:
           # List built wheels
           ls -la wheelhouse/
 
-      - name: Repair and patch wheel in Docker
+      - name: Repair and patch wheel in manylinux docker container
         run: |
           # Construct the expected Python executable path inside the container
           PYTHON_EXECUTABLE="/opt/python/${{ matrix.python_tag }}-${{ matrix.python_tag }}/bin/python"
