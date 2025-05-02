@@ -158,6 +158,12 @@ jobs:
           repository: numba/llvmlite
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install libomp and set DYLD_FALLBACK_LIBRARY_PATH
+        run: |
+          brew install libomp
+          echo "DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix libomp)/lib" >> $GITHUB_ENV
+          echo "Set DYLD_FALLBACK_LIBRARY_PATH to: $(brew --prefix libomp)/lib"
+
       - name: Validate and test wheel
         run: |
           PYTHON_PATH=$(which python${{ matrix.python-version }})
@@ -169,18 +175,7 @@ jobs:
               $PYTHON_PATH -m pip install -i $WHEELS_INDEX_URL llvmlite
           fi
           $PYTHON_PATH -m twine check dist/*.whl
-          $PYTHON_PATH -m pip install dist/numba*.whl numpy==${{ matrix.numpy_build }} intel-openmp
-
-          # Debug: Show intel-openmp installation details
-          $PYTHON_PATH -m pip show -f intel-openmp
-
-          find /usr/lib -name "*omp*" || echo "No omp files found in /usr/lib"
-
-          # Calculate and set DYLD_FALLBACK_LIBRARY_PATH relative to PYTHON_PATH
-          PYTHON_BIN_DIR=$(dirname $PYTHON_PATH)
-          PYTHON_LIB_DIR=$(dirname $PYTHON_BIN_DIR)/lib
-          echo "DYLD_FALLBACK_LIBRARY_PATH=$PYTHON_LIB_DIR" >> $GITHUB_ENV
-          echo "Setting DYLD_FALLBACK_LIBRARY_PATH to: $PYTHON_LIB_DIR"
+          $PYTHON_PATH -m pip install dist/numba*.whl numpy==${{ matrix.numpy_build }}
 
           # print Numba system information
           $PYTHON_PATH -m numba -s
