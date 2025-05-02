@@ -83,16 +83,15 @@ jobs:
           docker run --rm \
             -v ${{ github.workspace }}:/io \
             quay.io/pypa/manylinux2014_x86_64 \
-            bash -c '
-              set -ex
-              echo "Setting Git safe directory: /io"
-              git config --global --add safe.directory /io
-              echo "Executing build script: /io/buildscripts/github/build_wheel_linux-64.sh"
-              /io/buildscripts/github/build_wheel_linux-64.sh "$0" "$1" "$2" "$3" "$4"
+            bash -c ' \
+              set -ex; \
+              git config --global --add safe.directory /io; \
+              /io/buildscripts/github/build_wheel_linux-64.sh "$1" "$2" "$3" "$4" "$5"; \
             ' -- \
+            "bash" \
             "$PYTHON_EXECUTABLE" \
             "$USE_TBB" \
-            ${{ matrix.numpy_build }} \
+            "${{ matrix.numpy_build }}" \
             "/io/llvmlite_wheels" \
             "$WHEELS_INDEX_URL"
 
