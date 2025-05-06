@@ -28,10 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: load
-        run: |
-          echo "matrix-json<<EOF" >> $GITHUB_OUTPUT
-          cat .github/workflows/workflow_matrix_conda.json >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+        run: echo "matrix-json=$(cat .github/workflows/workflow_matrix_conda.json)" >> $GITHUB_OUTPUT
 
   osx-arm64-build-conda:
     name: osx-arm64-build-conda (py ${{ matrix.python-version }}, np ${{ matrix.numpy_build }})
