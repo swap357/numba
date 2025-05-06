@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: load
-        run: echo "::set-output name=matrix-json::$(<.github/workflows/workflow_matrix_conda.json)"
+        run: echo "::set-output name=matrix-json::$(cat .github/workflows/workflow_matrix_conda.json | tr -d '\n\r')"
 
   osx-arm64-build-conda:
     name: osx-arm64-build-conda (py ${{ matrix.python-version }}, np ${{ matrix.numpy_build }})
