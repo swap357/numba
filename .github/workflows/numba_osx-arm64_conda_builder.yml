@@ -24,14 +24,17 @@ jobs:
   load-matrix:
     runs-on: ubuntu-latest
     outputs:
-      build-matrix-json: ${{ steps.load.outputs.build-matrix-json }}
-      test-matrix-json: ${{ steps.load.outputs.test-matrix-json }}
+      build-matrix-json: ${{ steps.parse_matrix.outputs.build-matrix-json }}
+      test-matrix-json: ${{ steps.parse_matrix.outputs.test-matrix-json }}
     steps:
       - uses: actions/checkout@v4
-      - id: load
+      - id: parse_matrix
+        name: Parse Workflow Matrix JSON
         run: |
           BUILD_JSON=$(jq -c .build_matrix .github/workflows/workflow_matrix_conda.json)
           TEST_JSON=$(jq -c .test_matrix .github/workflows/workflow_matrix_conda.json)
+          echo "build matrix: $BUILD_JSON"
+          echo "test matrix: $TEST_JSON"
           echo "build-matrix-json=$BUILD_JSON" >> $GITHUB_OUTPUT
           echo "test-matrix-json=$TEST_JSON" >> $GITHUB_OUTPUT
 
