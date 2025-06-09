@@ -1,0 +1,286 @@
+name: test_python_314_dev
+
+on:
+  push:
+    branches:
+      - 'test/py314*'
+      - '*py314*'
+  pull_request:
+    paths:
+      - .github/workflows/test_python_314_dev.yml
+  workflow_dispatch:
+    inputs:
+      llvmlite_wheel_runid:
+        description: 'llvmlite wheel workflow run ID (optional)'
+        required: false
+        type: string
+
+# Add concurrency control
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  ARTIFACT_RETENTION_DAYS: 3
+  WHEELS_INDEX_URL: https://pypi.anaconda.org/numba/label/dev/simple
+
+jobs:
+  test-python-314-dev:
+    name: Python 3.14-dev test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true  # Don't fail the workflow if this experimental job fails
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-13, windows-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux-64
+          - os: macos-13
+            platform: osx-64
+          - os: windows-latest
+            platform: win-64
+
+    defaults:
+      run:
+        shell: bash -elx {0}
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python 3.14-dev
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14-dev'
+          allow-prereleases: true
+
+      - name: Install platform-specific dependencies (macOS)
+        if: matrix.os == 'macos-13'
+        run: |
+          # Install libomp for OpenMP support
+          brew install libomp || echo "libomp installation failed, continuing"
+          echo "DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix libomp)/lib" >> $GITHUB_ENV
+        continue-on-error: true
+
+      - name: Install platform-specific dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential || echo "build tools installation failed"
+        continue-on-error: true
+
+      - name: Install basic build dependencies
+        run: |
+          python -m pip install --upgrade pip build wheel twine
+          echo "Python version: $(python --version)"
+          echo "Pip version: $(pip --version)"
+
+      - name: Test NumPy compatibility
+        run: |
+          echo "Testing NumPy installation and compatibility..."
+
+          # Try different NumPy versions
+          python -m pip install "numpy>=2.1" || \
+          python -m pip install --pre numpy || \
+          echo "NumPy installation failed"
+
+          # Test NumPy import and basic functionality
+          python -c "
+          try:
+              import numpy as np
+              print(f'NumPy version: {np.__version__}')
+              print(f'NumPy basic test: {np.array([1, 2, 3]).sum()}')
+          except Exception as e:
+              print(f'NumPy test failed: {e}')
+          "
+        continue-on-error: true
+
+      - name: Download llvmlite wheel (if available)
+        if: inputs.llvmlite_wheel_runid != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: llvmlite-${{ matrix.platform }}-py3.14
+          path: llvmlite_wheels
+          run-id: ${{ inputs.llvmlite_wheel_runid }}
+          repository: numba/llvmlite
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Test llvmlite compatibility
+        run: |
+          echo "Testing llvmlite installation and compatibility..."
+
+          if [ -d "llvmlite_wheels" ] && [ "$(ls -A llvmlite_wheels)" ]; then
+            echo "Installing llvmlite from wheel artifact"
+            python -m pip install llvmlite_wheels/*.whl
+          else
+            echo "Trying to install llvmlite from PyPI..."
+            python -m pip install --pre llvmlite || \
+            python -m pip install llvmlite || \
+            echo "llvmlite installation failed, continuing without it"
+          fi
+
+          # Test llvmlite import
+          python -c "
+          try:
+              import llvmlite
+              print(f'llvmlite version: {llvmlite.__version__}')
+              print('llvmlite basic import successful')
+          except Exception as e:
+              print(f'llvmlite test failed: {e}')
+          "
+        continue-on-error: true
+
+      - name: Test basic Numba build
+        run: |
+          echo "Testing basic Numba build..."
+
+          # Try to build Numba
+          python -m build --wheel || {
+            echo "Wheel build failed, trying sdist..."
+            python -m build --sdist || echo "Build completely failed"
+          }
+
+          # List what was built
+          ls -la dist/ || echo "No dist directory created"
+        continue-on-error: true
+
+      - name: Test Numba installation (if build succeeded)
+        run: |
+          echo "Testing Numba installation..."
+
+          if [ -f dist/numba*.whl ]; then
+            echo "Installing from wheel..."
+            python -m pip install dist/numba*.whl
+          elif [ -f dist/numba*.tar.gz ]; then
+            echo "Installing from sdist..."
+            python -m pip install dist/numba*.tar.gz
+          else
+            echo "No Numba package found to install"
+            exit 0
+          fi
+
+          # Test basic import
+          python -c "
+          try:
+              import numba
+              print(f'Numba version: {numba.__version__}')
+              print('Numba basic import successful')
+          except Exception as e:
+              print(f'Numba import failed: {e}')
+              exit(0)  # Don't fail the step
+          "
+        continue-on-error: true
+
+      - name: Test basic JIT functionality
+        run: |
+          echo "Testing basic JIT functionality..."
+
+          python -c "
+          try:
+              import numba
+              from numba import jit
+              import numpy as np
+
+              print('Testing basic JIT compilation...')
+
+              @jit(nopython=True)
+              def simple_function(x):
+                  return x * 2 + 1
+
+              # Test with different types
+              result_int = simple_function(5)
+              result_float = simple_function(5.5)
+
+              print(f'JIT test with int: simple_function(5) = {result_int}')
+              print(f'JIT test with float: simple_function(5.5) = {result_float}')
+
+              # Test with numpy array
+              @jit(nopython=True)
+              def array_function(arr):
+                  return arr.sum()
+
+              test_array = np.array([1, 2, 3, 4, 5])
+              array_result = array_function(test_array)
+              print(f'JIT test with array: sum([1,2,3,4,5]) = {array_result}')
+
+              print('All JIT tests passed!')
+
+          except Exception as e:
+              print(f'JIT functionality test failed: {e}')
+              import traceback
+              traceback.print_exc()
+          "
+        continue-on-error: true
+
+      - name: Test system information
+        run: |
+          echo "Testing Numba system information..."
+
+          python -c "
+          try:
+              import numba
+              print('Attempting to get system information...')
+              # Try to get system info without using -s flag in case it fails
+              from numba import config
+              print(f'Numba config available: {hasattr(config, \"MACHINE_BITS\")}')
+          except Exception as e:
+              print(f'System info test failed: {e}')
+          "
+
+          # Try the command line version
+          python -m numba -s || echo "Command line system info failed"
+        continue-on-error: true
+
+      - name: Platform-specific wheel fixes (macOS)
+        if: matrix.os == 'macos-13' && success()
+        run: |
+          if [ -f dist/*.whl ]; then
+            echo "Attempting to fix macOS wheel library paths..."
+            cd dist
+            python ../buildscripts/github/patch_wheel_dylib.py ./*.whl || echo "Wheel patching failed"
+
+            # Inspect the wheel
+            find . -name "*.so" -o -name "*.dylib" | xargs -I {} otool -L {} || echo "otool inspection failed"
+          fi
+        continue-on-error: true
+
+      - name: Upload experimental artifacts
+        uses: actions/upload-artifact@v4
+        if: success() && (hashFiles('dist/*') != '')
+        with:
+          name: numba-py314-dev-${{ matrix.platform }}
+          path: dist/*
+          compression-level: 0
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: warn
+
+      - name: Test summary
+        run: |
+          echo "=== Python 3.14-dev Test Summary for ${{ matrix.os }} ==="
+          echo "Python version: $(python --version)"
+
+          echo -n "NumPy status: "
+          python -c "import numpy; print('✓ OK')" 2>/dev/null || echo "✗ FAILED"
+
+          echo -n "llvmlite status: "
+          python -c "import llvmlite; print('✓ OK')" 2>/dev/null || echo "✗ FAILED"
+
+          echo -n "Numba import status: "
+          python -c "import numba; print('✓ OK')" 2>/dev/null || echo "✗ FAILED"
+
+          echo -n "Numba JIT status: "
+          python -c "from numba import jit; jit(lambda x: x)(1); print('✓ OK')" 2>/dev/null || echo "✗ FAILED"
+
+          if [ -f dist/numba*.whl ]; then
+            echo "Build artifacts: ✓ Wheel created"
+          elif [ -f dist/numba*.tar.gz ]; then
+            echo "Build artifacts: ✓ Sdist created"
+          else
+            echo "Build artifacts: ✗ None created"
+          fi
+
+          echo "=== End Summary ==="
