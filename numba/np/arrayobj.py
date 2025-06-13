@@ -2397,16 +2397,17 @@ def np_clip(a, a_min, a_max, out=None):
 
     a_min_is_scalar = isinstance(a_min, types.Number)
     a_max_is_scalar = isinstance(a_max, types.Number)
-
+    rtype = np.promote_types(as_dtype(a.dtype), np.promote_types(as_dtype(a_min), as_dtype(a_max)))
     if a_min_is_scalar and a_max_is_scalar:
         def np_clip_ss(a, a_min, a_max, out=None):
             # a_min and a_max are scalars
             # since their shape will be empty
             # so broadcasting is not needed at all
-            ret = np.empty_like(a) if out is None else out
+
+            ret = np.empty_like(a, dtype=rtype) if out is None else out
             for index in np.ndindex(a.shape):
                 val_a = a[index]
-                ret[index] = min(max(val_a, a_min), a_max)
+                ret[index] = np.minimum(np.maximum(val_a, a_min), a_max)
 
             return ret
 
