@@ -1752,6 +1752,25 @@ class TestArrayMethods(MemoryLeakMixin, TestCase):
             with self.assertRaisesRegex(ValueError, msg):
                 cfunc(a, a_min, a_max)
 
+    def test_clip_broadcast_expand(self):
+        has_out = (np_clip, np_clip_kwargs, array_clip, array_clip_kwargs)
+        has_no_out = (np_clip_no_out, array_clip_no_out)
+        a = np.array([[1], [2]])
+        a_max = np.array([3, 4, 5])
+        a_min = 0
+        for pyfunc in has_out + has_no_out:
+            cfunc = jit(nopython=True)(pyfunc)
+            expected = pyfunc(a, a_min, a_max)
+            got = cfunc(a, a_min, a_max)
+            np.testing.assert_equal(expected, got)
+
+            if pyfunc in has_out:
+                pyout = np.empty_like(expected)
+                cout = np.empty_like(expected)
+                np.testing.assert_equal(pyfunc(a, a_min, a_max, pyout),
+                                        cfunc(a, a_min, a_max, cout))
+                np.testing.assert_equal(pyout, cout)
+
     def test_conj(self):
         for pyfunc in [array_conj, array_conjugate]:
             cfunc = jit(nopython=True)(pyfunc)
@@ -1774,6 +1793,7 @@ class TestArrayMethods(MemoryLeakMixin, TestCase):
         check(np.array(np.zeros(5)))
         check(np.array([[3.1, 3.1], [1.7, 2.29], [3.3, 1.7]]))
         check(np.array([]))
+        check(np.array([np.nan, np.nan]))
 
     @needs_blas
     def test_array_dot(self):
