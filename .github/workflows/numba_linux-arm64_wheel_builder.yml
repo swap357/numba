@@ -27,8 +27,8 @@ env:
 jobs:
   load-matrix:
     if: |
-      github.event_name != 'pull_request_target' || (
-        github.event_name == 'pull_request_target' &&
+      github.event_name != 'pull_request' || (
+        github.event_name == 'pull_request' &&
         github.event.action == 'labeled' &&
         github.event.label.name == 'build_wheel_on_gha'
       )
