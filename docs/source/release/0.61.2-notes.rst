@@ -61,6 +61,21 @@ target specific. This is now rectified and refactored so as to provide a
 
 (`PR-#9972 <https://github.com/numba/numba/pull/9972>`__)
 
+Correct ``np.clip`` broadcasting for expanded outputs
+----------------------------------------------------
+
+Broadcasted clipping could incorrectly allocate the output array based on the
+input's shape, leading to shape mismatches when the broadcast result was larger.
+The allocation now uses the broadcasted shape so that calls such as:
+
+.. code-block:: python
+
+   np.clip(np.array([[1], [2]]), a_min=0, a_max=np.array([3, 4, 5]))
+
+produce arrays of shape ``(2, 3)`` as in NumPy.
+
+(`PR-#9991 <https://github.com/numba/numba/issues/9991>`__)
+
 Pull-Requests:
 
 * PR `#9919 <https://github.com/numba/numba/pull/9919>`_: Support for NumPy 2.2 (`kc611 <https://github.com/kc611>`__)

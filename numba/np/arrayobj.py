@@ -2342,8 +2342,8 @@ def array_flatten(context, builder, sig, args):
 @register_jitable
 def _np_clip_impl(a, a_min, a_max, out):
     # Both a_min and a_max are numpy arrays
-    ret = np.empty_like(a) if out is None else out
     a_b, a_min_b, a_max_b = np.broadcast_arrays(a, a_min, a_max)
+    ret = np.empty_like(a_b) if out is None else out
     for index in np.ndindex(a_b.shape):
         val_a = a_b[index]
         val_a_min = a_min_b[index]
@@ -2464,16 +2464,16 @@ def np_clip(a, a_min, a_max, out=None):
         if a_min_is_none:
             def np_clip_na(a, a_min, a_max, out=None):
                 # a_max is a numpy array but a_min is None
-                ret = np.empty_like(a) if out is None else out
                 a_b, a_max_b = np.broadcast_arrays(a, a_max)
+                ret = np.empty_like(a_b) if out is None else out
                 return _np_clip_impl_none(a_b, a_max_b, True, ret)
 
             return np_clip_na
         elif a_max_is_none:
             def np_clip_an(a, a_min, a_max, out=None):
                 # a_min is a numpy array but a_max is None
-                ret = np.empty_like(a) if out is None else out
                 a_b, a_min_b = np.broadcast_arrays(a, a_min)
+                ret = np.empty_like(a_b) if out is None else out
                 return _np_clip_impl_none(a_b, a_min_b, False, ret)
 
             return np_clip_an
