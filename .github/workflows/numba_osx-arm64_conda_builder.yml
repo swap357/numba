@@ -2,9 +2,11 @@ name: numba_osx-arm64_conda_builder
 
 on:
   pull_request:
+    types: [labeled]
     paths:
       - .github/workflows/numba_osx-arm64_conda_builder.yml
       - buildscripts/condarecipe.local/**
+      - .github/workflows/conda_workflow_matrix.json
   workflow_dispatch:
     inputs:
       llvmlite_run_id:
@@ -22,6 +24,12 @@ env:
 
 jobs:
   load-matrix:
+    if: |
+      github.event_name != 'pull_request_target' || (
+        github.event_name == 'pull_request_target' &&
+        github.event.action == 'labeled' &&
+        github.event.label.name == 'build_conda_on_gha'
+      )
     runs-on: ubuntu-latest
     outputs:
       build-matrix-json: ${{ steps.parse_matrix.outputs.build-matrix-json }}
@@ -31,8 +39,8 @@ jobs:
       - id: parse_matrix
         name: Parse Workflow Matrix JSON
         run: |
-          BUILD_JSON=$(jq -c .conda_build_matrix .github/workflows/workflow_matrix.json)
-          TEST_JSON=$(jq -c .conda_test_matrix .github/workflows/workflow_matrix.json)
+          BUILD_JSON=$(jq -c .conda_build_matrix .github/workflows/conda_workflow_matrix.json)
+          TEST_JSON=$(jq -c .conda_test_matrix .github/workflows/conda_workflow_matrix.json)
           echo "build matrix: $BUILD_JSON"
           echo "test matrix: $TEST_JSON"
           echo "build-matrix-json=$BUILD_JSON" >> $GITHUB_OUTPUT
