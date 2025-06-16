@@ -98,14 +98,25 @@ jobs:
           "
         continue-on-error: true
 
-      - name: Download llvmlite wheel (if available)
-        if: inputs.llvmlite_wheel_runid != ''
+      - name: Download llvmlite wheel (macOS x64)
+        if: matrix.os == 'macos-13' && inputs.llvmlite_wheel_runid != ''
         uses: actions/download-artifact@v4
         with:
-          name: llvmlite-${{ matrix.platform }}-py3.14
+          name: llvmlite-osx-64-py314-dev
           path: llvmlite_wheels
           run-id: ${{ inputs.llvmlite_wheel_runid }}
-          repository: numba/llvmlite
+          repository: swap357/llvmlite
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Download llvmlite wheel (macOS ARM64)
+        if: matrix.os == 'macos-13' && inputs.llvmlite_wheel_runid != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: llvmlite-osx-arm64-py314-dev
+          path: llvmlite_wheels
+          run-id: ${{ inputs.llvmlite_wheel_runid }}
+          repository: swap357/llvmlite
           github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
