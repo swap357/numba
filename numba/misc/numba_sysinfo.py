@@ -140,8 +140,8 @@ def get_os_spec_info(os_name):
         'Windows': {
             'cmd': (),
             'cmd_optional': (
-                CmdBufferOut(('wmic', 'OS', 'get', 'TotalVirtualMemorySize')),
-                CmdBufferOut(('wmic', 'OS', 'get', 'FreeVirtualMemory')),
+                CmdBufferOut(('powershell', '-NoProfile', '-Command', "'TotalVirtualMemorySize ' + (Get-CimInstance -ClassName Win32_OperatingSystem).TotalVirtualMemorySize")),
+                CmdBufferOut(('powershell', '-NoProfile', '-Command', "'FreeVirtualMemory ' + (Get-CimInstance -ClassName Win32_OperatingSystem).FreeVirtualMemory")),
             ),
             'kwds': {
                 # output string fragment -> result dict key
