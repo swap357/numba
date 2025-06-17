@@ -157,10 +157,4 @@ jobs:
             numpy=${{ matrix.numpy_test }} \
             win-64/numba*.conda
 
-          # Setup PATH for Windows system tools before testing
-          export PATH="/c/Windows/System32:/c/Windows/System32/Wbem:/c/Windows/System32/WindowsPowerShell/v1.0:$PATH"
-
-          # Run specific sysinfo test to verify Windows 2025 migration
-          echo "Running sysinfo test to verify Windows 2025 compatibility"
-          echo "PATH: $PATH"
-          python -m numba.runtests numba.tests.test_sysinfo.TestSysInfo -v || echo "Sysinfo test failed, but continuing..."
+          python -m numba.runtests numba.tests.test_sysinfo.TestSysInfo -v
