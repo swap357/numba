@@ -156,4 +156,4 @@ jobs:
 
           # print Numba system information
           python -m numba -s
-          python -m numba.runtests numba.tests.test_sysinfo.TestSysInfo -v
+          python -m numba.runtests numba.tests.test_sysinfo.TestSysInfo -v -s
