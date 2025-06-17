@@ -155,6 +155,7 @@ jobs:
           # Install the package
           conda install -c $LLVMLITE_CHANNEL -c defaults \
             numpy=${{ matrix.numpy_test }} \
+            --test \
             win-64/numba*.conda
 
           python -m numba.runtests numba.tests.test_sysinfo.TestSysInfo -v
