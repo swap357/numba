@@ -83,7 +83,7 @@ jobs:
           name: llvmlite-osx-arm64-py${{ matrix.python_canonical }}
           path: llvmlite_wheels
           run-id: ${{ inputs.llvmlite_wheel_runid }}
-          repository: numba/llvmlite
+          repository: swap357/llvmlite
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install build dependencies
@@ -173,7 +173,7 @@ jobs:
           name: llvmlite-osx-arm64-py${{ matrix.python_canonical }}
           path: llvmlite_wheels
           run-id: ${{ inputs.llvmlite_wheel_runid }}
-          repository: numba/llvmlite
+          repository: swap357/llvmlite
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install libomp and set DYLD_FALLBACK_LIBRARY_PATH

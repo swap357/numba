@@ -82,7 +82,7 @@ jobs:
           name: llvmlite-linux-64-py${{ matrix.python_canonical }}
           path: llvmlite_wheels
           run-id: ${{ inputs.llvmlite_wheel_runid }}
-          repository: numba/llvmlite
+          repository: swap357/llvmlite
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build wheel in manylinux docker container
@@ -180,7 +180,7 @@ jobs:
           name: llvmlite-linux-64-py${{ matrix.python_canonical }}
           path: llvmlite_wheels
           run-id: ${{ inputs.llvmlite_wheel_runid }}
-          repository: numba/llvmlite
+          repository: swap357/llvmlite
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Validate and test wheel
