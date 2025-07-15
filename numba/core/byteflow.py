@@ -452,6 +452,9 @@ class TraceRunner(object):
     def op_POP_TOP(self, state, inst):
         state.pop()
 
+    if PYVERSION in ((3, 14),):
+        op_POP_ITER = op_POP_TOP
+
     if PYVERSION in ((3, 13), (3, 14)):
         def op_TO_BOOL(self, state, inst):
             res = state.make_temp()
