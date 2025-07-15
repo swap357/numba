@@ -17,12 +17,19 @@ _logger = logging.getLogger(__name__)
 
 _EXCEPT_STACK_OFFSET = 6
 _FINALLY_POP = _EXCEPT_STACK_OFFSET
-_NO_RAISE_OPS = frozenset({
+# Base set of no-raise operations
+_NO_RAISE_OPS_BASE = frozenset({
     'LOAD_CONST',
     'NOP',
     'LOAD_DEREF',
     'PRECALL',
 })
+
+# Add version-specific operations
+if PYVERSION in ((3, 14),):
+    _NO_RAISE_OPS = frozenset(_NO_RAISE_OPS_BASE | {'LOAD_SMALL_INT'})
+else:
+    _NO_RAISE_OPS = _NO_RAISE_OPS_BASE
 
 if PYVERSION in ((3, 12), (3, 13), (3, 14)):
     from enum import Enum
@@ -499,6 +506,13 @@ class TraceRunner(object):
         state.push(res)
         state.append(inst, res=res)
 
+    if PYVERSION in ((3, 14),):
+        op_LOAD_SMALL_INT = op_LOAD_CONST
+    elif PYVERSION in ((3, 10), (3, 11), (3, 12), (3, 13)):
+        pass
+    else:
+        raise NotImplementedError(PYVERSION)
+
     def op_LOAD_ATTR(self, state, inst):
         item = state.pop()
         res = state.make_temp()
@@ -571,9 +585,10 @@ class TraceRunner(object):
             value2 = state.pop()
             state.append(inst, value1=value1, value2=value2)
 
-        if PYVERSION in ((3, 14)):
+        if PYVERSION in ((3, 14),):
             op_LOAD_FAST_BORROW_LOAD_FAST_BORROW = op_LOAD_FAST_LOAD_FAST
             op_LOAD_FAST_BORROW = op_LOAD_FAST
+
     elif PYVERSION in ((3, 10), (3, 11), (3, 12)):
         pass
     else:
