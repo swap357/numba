@@ -1899,6 +1899,9 @@ class Interpreter(object):
     def op_PUSH_NULL(self, inst):
         pass
 
+    def op_POP_ITER(self, inst):
+        pass
+
     def op_RETURN_GENERATOR(self, inst):
         pass
 
@@ -2244,6 +2247,9 @@ class Interpreter(object):
     else:
         op_LOAD_FAST = _op_LOAD_FAST
 
+    if PYVERSION in ((3, 14),):
+            op_LOAD_FAST_BORROW = op_LOAD_FAST
+
     if PYVERSION in ((3, 13), (3, 14),):
         def op_LOAD_FAST_LOAD_FAST(self, inst, res1, res2):
             oparg = inst.arg
@@ -2276,7 +2282,7 @@ class Interpreter(object):
             dstname = self.code_locals[oparg2]
             self.store(value=self.get(value2), name=dstname)
 
-        if PYVERSION in ((3, 14)):
+        if PYVERSION in ((3, 14),):
             op_LOAD_FAST_BORROW_LOAD_FAST_BORROW = op_LOAD_FAST_LOAD_FAST
 
     elif PYVERSION in ((3, 10), (3, 11), (3, 12)):
@@ -2361,6 +2367,9 @@ class Interpreter(object):
         else:
             const = ir.Const(value, loc=self.loc)
         self.store(const, res)
+
+    if PYVERSION in ((3, 14),):
+        op_LOAD_SMALL_INT = op_LOAD_CONST
 
     if PYVERSION in ((3, 11), (3, 12), (3, 13), (3, 14)):
         def op_LOAD_GLOBAL(self, inst, idx, res):
