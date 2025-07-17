@@ -85,6 +85,8 @@ BINOPS_TO_OPERATORS = {
     # This one has its args reversed!
     'in': operator.contains,
     '@': operator.matmul,
+    # Python 3.14 added a new bin op
+    '[]': operator.getitem,
 }
 
 INPLACE_BINOPS_TO_OPERATORS = {
