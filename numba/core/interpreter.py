@@ -1887,6 +1887,9 @@ class Interpreter(object):
     def op_NOP(self, inst):
         pass
 
+    def op_NOT_TAKEN(self, inst):
+        pass
+
     def op_RESUME(self, inst):
         pass
 
