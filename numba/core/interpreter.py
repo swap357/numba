@@ -2371,8 +2371,12 @@ class Interpreter(object):
             const = ir.Const(value, loc=self.loc)
         self.store(const, res)
 
-    if PYVERSION in ((3, 14),):
-        op_LOAD_SMALL_INT = op_LOAD_CONST
+    def op_LOAD_SMALL_INT(self, inst, res):
+        # LOAD_SMALL_INT loads small integers directly from the instruction argument
+        # The argument is the actual integer value, not an index into co_consts
+        value = inst.arg
+        const = ir.Const(value, loc=self.loc)
+        self.store(const, res)
 
     if PYVERSION in ((3, 11), (3, 12), (3, 13), (3, 14)):
         def op_LOAD_GLOBAL(self, inst, idx, res):

@@ -514,7 +514,12 @@ class TraceRunner(object):
         state.append(inst, res=res)
 
     if PYVERSION in ((3, 14),):
-        op_LOAD_SMALL_INT = op_LOAD_CONST
+        def op_LOAD_SMALL_INT(self, state, inst):
+            # LOAD_SMALL_INT loads the integer value directly from inst.arg
+            # It doesn't use the constants table like LOAD_CONST does
+            res = state.make_temp("const") + f".{inst.arg}"
+            state.push(res)
+            state.append(inst, res=res)
     elif PYVERSION in ((3, 10), (3, 11), (3, 12), (3, 13)):
         pass
     else:
