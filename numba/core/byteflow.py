@@ -21,6 +21,7 @@ _FINALLY_POP = _EXCEPT_STACK_OFFSET
 _NO_RAISE_OPS_BASE = frozenset({
     'LOAD_CONST',
     'NOP',
+    'NOT_TAKEN',
     'LOAD_DEREF',
     'PRECALL',
 })
@@ -377,6 +378,9 @@ class TraceRunner(object):
         state.fork(pc=tryblk['end'], **kwargs)
 
     def op_NOP(self, state, inst):
+        state.append(inst)
+
+    def op_NOT_TAKEN(self, state, inst):
         state.append(inst)
 
     def op_RESUME(self, state, inst):
