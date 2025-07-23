@@ -18,19 +18,12 @@ _logger = logging.getLogger(__name__)
 _EXCEPT_STACK_OFFSET = 6
 _FINALLY_POP = _EXCEPT_STACK_OFFSET
 # Base set of no-raise operations
-_NO_RAISE_OPS_BASE = frozenset({
+_NO_RAISE_OPS = frozenset({
     'LOAD_CONST',
     'NOP',
-    'NOT_TAKEN',
     'LOAD_DEREF',
     'PRECALL',
 })
-
-# Add version-specific operations
-if PYVERSION in ((3, 14),):
-    _NO_RAISE_OPS = frozenset(_NO_RAISE_OPS_BASE | {'LOAD_SMALL_INT'})
-else:
-    _NO_RAISE_OPS = _NO_RAISE_OPS_BASE
 
 if PYVERSION in ((3, 12), (3, 13), (3, 14)):
     from enum import Enum
@@ -380,8 +373,13 @@ class TraceRunner(object):
     def op_NOP(self, state, inst):
         state.append(inst)
 
-    def op_NOT_TAKEN(self, state, inst):
-        state.append(inst)
+    if PYVERSION in ((3,14), ):
+        # New in 3.14
+        op_NOT_TAKEN = op_NOP
+    elif PYVERSION in ((3, 10), (3, 11), (3, 12), (3, 13)):
+        pass
+    else:
+        raise NotImplementedError(PYVERSION)
 
     def op_RESUME(self, state, inst):
         state.append(inst)
@@ -458,6 +456,10 @@ class TraceRunner(object):
 
     if PYVERSION in ((3, 14),):
         op_POP_ITER = op_POP_TOP
+    elif PYVERSION in ((3, 10), (3, 11), (3, 12), (3, 13)):
+        pass
+    else:
+        raise NotImplementedError(PYVERSION)
 
     if PYVERSION in ((3, 13), (3, 14)):
         def op_TO_BOOL(self, state, inst):
@@ -517,6 +519,7 @@ class TraceRunner(object):
         def op_LOAD_SMALL_INT(self, state, inst):
             # LOAD_SMALL_INT loads the integer value directly from inst.arg
             # It doesn't use the constants table like LOAD_CONST does
+            assert 0 <= inst.arg < 256
             res = state.make_temp("const") + f".{inst.arg}"
             state.push(res)
             state.append(inst, res=res)
@@ -543,7 +546,6 @@ class TraceRunner(object):
         state.append(inst, item=item, res=res)
 
     def op_LOAD_FAST(self, state, inst):
-        assert PYVERSION <= (3, 14)
         if PYVERSION in ((3, 13), (3, 14)):
             try:
                 name = state.get_varname(inst)
@@ -1205,12 +1207,18 @@ class TraceRunner(object):
             state.append(inst, kind='with')
         state.fork(pc=inst.next)
 
-    def op_BINARY_SUBSCR(self, state, inst):
-        index = state.pop()
-        target = state.pop()
-        res = state.make_temp()
-        state.append(inst, index=index, target=target, res=res)
-        state.push(res)
+    if PYVERSION in ((3, 14),):
+         # Removed in 3.14 -- replaced with BINARY_OP and []
+         pass
+    elif PYVERSION in ((3, 10), (3, 11), (3, 12), (3, 13)):
+        def op_BINARY_SUBSCR(self, state, inst):
+            index = state.pop()
+            target = state.pop()
+            res = state.make_temp()
+            state.append(inst, index=index, target=target, res=res)
+            state.push(res)
+    else:
+         raise NotImplementedError(PYVERSION)
 
     def op_STORE_SUBSCR(self, state, inst):
         index = state.pop()
@@ -1588,10 +1596,17 @@ class TraceRunner(object):
         op = dis._nb_ops[inst.arg][1]
         rhs = state.pop()
         lhs = state.pop()
-        op_name = ALL_BINOPS_TO_OPERATORS[op].__name__
-        res = state.make_temp(prefix=f"binop_{op_name}")
-        state.append(inst, op=op, lhs=lhs, rhs=rhs, res=res)
-        state.push(res)
+        if op == '[]':
+             # Special case 3.14 -- body of BINARY_SUBSCR now here
+             assert PYVERSION == (3, 14)
+             res = state.make_temp()
+             state.append(inst, op=op, lhs=lhs, rhs=rhs, res=res)
+             state.push(res)
+        else:
+            op_name = ALL_BINOPS_TO_OPERATORS[op].__name__
+            res = state.make_temp(prefix=f"binop_{op_name}")
+            state.append(inst, op=op, lhs=lhs, rhs=rhs, res=res)
+            state.push(res)
 
     def _unaryop(self, state, inst):
         val = state.pop()
