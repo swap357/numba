@@ -147,7 +147,8 @@ jobs:
         run: |
           # Set channel based on whether llvmlite artifact was downloaded
           if [ "${{ inputs.llvmlite_run_id }}" != "" ]; then
-            LLVMLITE_CHANNEL="file://${{ github.workspace }}/llvmlite_conda"
+            # On Windows, use absolute path without file:// prefix for local conda channels
+            LLVMLITE_CHANNEL="${{ github.workspace }}/llvmlite_conda"
           else
             LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_NUMBA }}"
           fi
