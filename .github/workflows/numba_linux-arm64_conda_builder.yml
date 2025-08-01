@@ -69,7 +69,7 @@ jobs:
         if: ${{ inputs.llvmlite_run_id != '' }}
         uses: actions/download-artifact@v4
         with:
-          name: llvmlite-linux-arm64-py${{ matrix.python-version }}
+          name: llvmlite-linux-aarch64-py${{ matrix.python-version }}
           path: llvmlite_conda
           run-id: ${{ inputs.llvmlite_run_id }}
           repository: swap357/llvmlite
@@ -136,7 +136,7 @@ jobs:
         if: ${{ inputs.llvmlite_run_id != '' }}
         uses: actions/download-artifact@v4
         with:
-          name: llvmlite-linux-arm64-py${{ matrix.python-version }}
+          name: llvmlite-linux-aarch64-py${{ matrix.python-version }}
           path: llvmlite_conda
           run-id: ${{ inputs.llvmlite_run_id }}
           repository: swap357/llvmlite
