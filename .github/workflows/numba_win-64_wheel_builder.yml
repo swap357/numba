@@ -2,6 +2,7 @@ name: numba_win-64_wheel_builder
 
 on:
   pull_request:
+    types: [labeled]
     paths:
       - .github/workflows/numba_win-64_wheel_builder.yml
       - .github/workflows/wheel_workflow_matrix.json
@@ -24,6 +25,12 @@ env:
 
 jobs:
   load-matrix:
+    if: |
+      github.event_name != 'pull_request' || (
+        github.event_name == 'pull_request' &&
+        github.event.action == 'labeled' &&
+        github.event.label.name == 'build_wheel_on_gha'
+      )
     runs-on: ubuntu-latest
     outputs:
       build-matrix-json: ${{ steps.load_matrix_json.outputs.build-matrix-json }}
