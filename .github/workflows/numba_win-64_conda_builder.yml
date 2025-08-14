@@ -115,10 +115,10 @@ jobs:
         run: |
           conda install conda-build
 
-      - name: Run specific failing tests for debugging (issue #10177)
+      - name: run failing tests
         env:
-          # Target specific tests that are failing on Windows runners
-          TESTS_TO_RUN: "numba.tests.test_num_threads::TestNumThreadsBackends::test_threadmask_across_fork_workqueue_2_threads numba.tests.test_runtests::TestCase::test_include_exclude_tags numba.tests.test_parallel_backend::TestSpecificBackend::test_threading_concurrent_guvectorize_omp numba.tests.test_parallel_backend::TestThreadingLayerPriority::test_omp numba.tests.test_num_threads::TestNumThreadsBackends::test_set_num_threads_outside_jit_omp_4_threads numba.tests.test_parallel_backend::TestSpecificBackend::test_multiprocessing_spawn_concurrent_jit_workqueue numba.tests.test_num_threads::TestNumThreadsBackends::test_get_num_threads_truth_outside_jit_omp_2_threads"
+          # Target specific test modules that contain failing tests on Windows runners
+          TESTS_TO_RUN: "numba.tests.test_num_threads numba.tests.test_runtests numba.tests.test_parallel_backend"
           NUMBA_ENABLE_CUDASIM: 1
         run: |
           LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_NUMBA }}"
