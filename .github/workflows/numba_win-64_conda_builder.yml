@@ -7,27 +7,6 @@ on:
       - buildscripts/condarecipe.local/**
       - .github/workflows/conda_workflow_matrix.json
   workflow_dispatch:
-    inputs:
-      llvmlite_run_id:
-        description: 'llvmlite workflow run ID (optional)'
-        required: false
-        type: string
-      tests_to_run:
-        description: 'Pytest selection (space-separated nodeids or modules); defaults to numba.tests'
-        required: false
-        type: string
-      python_version:
-        description: 'Limit matrix to this Python version (e.g. 3.12)'
-        required: false
-        type: string
-      numpy_build:
-        description: 'Limit build matrix to this NumPy version (e.g. 2.2)'
-        required: false
-        type: string
-      numpy_test:
-        description: 'Limit test matrix to this NumPy version (e.g. 2.2)'
-        required: false
-        type: string
 
 # Add concurrency control
 concurrency:
@@ -48,15 +27,9 @@ jobs:
       - id: parse_matrix
         name: Parse Workflow Matrix JSON
         run: |
-          set -euo pipefail
-          PY_FILTER="${{ inputs.python_version || '' }}"
-          NP_BUILD_FILTER="${{ inputs.numpy_build || '' }}"
-          NP_TEST_FILTER="${{ inputs.numpy_test || '' }}"
-
-          BUILD_JSON=$(jq -c '.conda_build_matrix | map(select((env.PY_FILTER == "" or .["python-version"] == env.PY_FILTER) and (env.NP_BUILD_FILTER == "" or .numpy_build == env.NP_BUILD_FILTER)))' \
-            .github/workflows/conda_workflow_matrix.json)
-          TEST_JSON=$(jq -c '.conda_test_matrix | map(select((env.PY_FILTER == "" or .["python-version"] == env.PY_FILTER) and (env.NP_TEST_FILTER == "" or .numpy_test == env.NP_TEST_FILTER)))' \
-            .github/workflows/conda_workflow_matrix.json)
+          # Limit to Python 3.12 + NumPy 2.2 for debugging Windows test failures (issue #10177)
+          BUILD_JSON='[{"python-version": "3.12", "numpy_build": "2.0"}]'
+          TEST_JSON='[{"python-version": "3.12", "numpy_test": "2.2"}]'
           echo "Build Matrix JSON: $BUILD_JSON"
           echo "Test Matrix JSON: $TEST_JSON"
           echo "build-matrix-json=$BUILD_JSON" >> $GITHUB_OUTPUT
@@ -87,15 +60,7 @@ jobs:
           auto-activate-base: true
           activate-environment: ""
 
-      - name: Download llvmlite Artifact
-        if: ${{ inputs.llvmlite_run_id != '' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: llvmlite-win-64-py${{ matrix.python-version }}
-          path: llvmlite_conda
-          run-id: ${{ inputs.llvmlite_run_id }}
-          repository: numba/llvmlite
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+
 
       - name: Install conda-build
         run: conda install conda-build
@@ -105,12 +70,7 @@ jobs:
           CONDA_CHANNEL_DIR="conda_channel_dir"
           mkdir -p $CONDA_CHANNEL_DIR
 
-          # Set channel based on whether llvmlite artifact was downloaded
-          if [ "${{ inputs.llvmlite_run_id }}" != "" ]; then
-            LLVMLITE_CHANNEL="${{ github.workspace }}/llvmlite_conda"
-          else
-            LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_NUMBA }}"
-          fi
+          LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_NUMBA }}"
 
           conda build --debug -c $LLVMLITE_CHANNEL -c defaults \
             --python=${{ matrix.python-version }} \
@@ -144,15 +104,7 @@ jobs:
       - name: Setup miniconda
         uses: conda-incubator/setup-miniconda@v3
 
-      - name: Download llvmlite artifact
-        if: ${{ inputs.llvmlite_run_id != '' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: llvmlite_win-64_conda_py${{ matrix.python-version }}
-          path: llvmlite_conda
-          run-id: ${{ inputs.llvmlite_run_id }}
-          repository: numba/llvmlite
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+
 
       - name: Download numba artifact
         uses: actions/download-artifact@v4
@@ -163,17 +115,13 @@ jobs:
         run: |
           conda install conda-build
 
-      - name: Run tests
+      - name: Run specific failing tests for debugging (issue #10177)
         env:
-          TESTS_TO_RUN: ${{ inputs.tests_to_run || 'numba.tests' }}
+          # Target specific tests that are failing on Windows runners
+          TESTS_TO_RUN: "numba.tests.test_num_threads::TestNumThreadsBackends::test_threadmask_across_fork_workqueue_2_threads numba.tests.test_runtests::TestCase::test_include_exclude_tags numba.tests.test_parallel_backend::TestSpecificBackend::test_threading_concurrent_guvectorize_omp numba.tests.test_parallel_backend::TestThreadingLayerPriority::test_omp numba.tests.test_num_threads::TestNumThreadsBackends::test_set_num_threads_outside_jit_omp_4_threads numba.tests.test_parallel_backend::TestSpecificBackend::test_multiprocessing_spawn_concurrent_jit_workqueue numba.tests.test_num_threads::TestNumThreadsBackends::test_get_num_threads_truth_outside_jit_omp_2_threads"
           NUMBA_ENABLE_CUDASIM: 1
         run: |
-          # Set channel based on whether llvmlite artifact was downloaded
-          if [ "${{ inputs.llvmlite_run_id }}" != "" ]; then
-            LLVMLITE_CHANNEL="file://${{ github.workspace }}/llvmlite_conda"
-          else
-            LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_NUMBA }}"
-          fi
+          LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_NUMBA }}"
 
           conda build -c $LLVMLITE_CHANNEL -c defaults \
             --extra-deps numpy=${{ matrix.numpy_test }} \
