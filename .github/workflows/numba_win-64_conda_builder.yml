@@ -119,7 +119,8 @@ jobs:
         env:
           TESTS_TO_RUN: "numba.tests.test_num_threads numba.tests.test_runtests numba.tests.test_parallel_backend"
           NUMBA_ENABLE_CUDASIM: 1
-          NUMBA_DISABLE_TBB: 1
+          # Force OpenMP backend to avoid TBB DLL crash
+          NUMBA_THREADING_LAYER: omp
         run: |
           LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_NUMBA }}"
 
@@ -127,46 +128,3 @@ jobs:
             --extra-deps numpy=${{ matrix.numpy_test }} \
             --test \
             win-64/numba*.conda
-
-      - name: Install numba directly and run tests
-        env:
-          NUMBA_ENABLE_CUDASIM: 1
-          NUMBA_DISABLE_TBB: 1
-        run: |
-          # Run tests directly with python -m numba.runtests
-          echo "Running tests directly"
-          python -m numba.runtests -v \
-            numba.tests.test_num_threads \
-            numba.tests.test_runtests \
-            numba.tests.test_parallel_backend
-
-      - name: Debug threading layer info
-        if: always()  # Run even if tests fail
-        run: |
-          # Check what's available after test run
-          python -c "
-          import sys
-          print('=== WINDOWS THREADING DEBUG ===')
-          print(f'Python: {sys.version}')
-          try:
-              import numba
-              print(f'Numba: {numba.__version__}')
-              from numba import threading_layer
-              print(f'Current threading layer: {threading_layer()}')
-              # Check what backends are available
-              try:
-                  from numba.np.ufunc import omppool
-                  print('OpenMP: Available')
-                  print(f'OpenMP vendor: {omppool.openmp_vendor}')
-              except Exception as e:
-                  print(f'OpenMP: Failed - {e}')
-              try:
-                  from numba.np.ufunc import tbbpool
-                  print('TBB: Available')
-              except Exception as e:
-                  print(f'TBB: Failed - {e}')
-              print('Workqueue: Available (built-in)')
-          except Exception as e:
-              print(f'Numba import failed: {e}')
-          print('=== END DEBUG ===')
-          "
