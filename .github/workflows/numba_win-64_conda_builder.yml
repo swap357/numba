@@ -115,13 +115,11 @@ jobs:
         run: |
           conda install conda-build
 
-      - name: run failing tests
+      - name: run failing tests via conda build
         env:
           # Target specific test modules that contain failing tests on Windows runners
           TESTS_TO_RUN: "numba.tests.test_num_threads numba.tests.test_runtests numba.tests.test_parallel_backend"
           NUMBA_ENABLE_CUDASIM: 1
-          # Fix Windows networking issues (WinError 10106)
-          PYTHONIOENCODING: utf-8
         run: |
           LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_NUMBA }}"
 
@@ -129,6 +127,22 @@ jobs:
             --extra-deps numpy=${{ matrix.numpy_test }} \
             --test \
             win-64/numba*.conda
+
+      - name: Install numba directly and run tests
+        env:
+          NUMBA_ENABLE_CUDASIM: 1
+        run: |
+          # Install numba from the built conda package
+          conda install -c ${{ env.CONDA_CHANNEL_NUMBA }} -c defaults \
+            numpy=${{ matrix.numpy_test }} \
+            ./win-64/numba*.conda
+
+          # Run tests directly with python -m numba.runtests
+          echo "Running tests directly"
+          python -m numba.runtests -v \
+            numba.tests.test_num_threads \
+            numba.tests.test_runtests \
+            numba.tests.test_parallel_backend
 
       - name: Debug threading layer info
         if: always()  # Run even if tests fail
