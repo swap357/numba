@@ -117,9 +117,9 @@ jobs:
 
       - name: run failing tests via conda build
         env:
-          # Target specific test modules that contain failing tests on Windows runners
           TESTS_TO_RUN: "numba.tests.test_num_threads numba.tests.test_runtests numba.tests.test_parallel_backend"
           NUMBA_ENABLE_CUDASIM: 1
+          NUMBA_DISABLE_TBB: 1
         run: |
           LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_NUMBA }}"
 
@@ -131,12 +131,8 @@ jobs:
       - name: Install numba directly and run tests
         env:
           NUMBA_ENABLE_CUDASIM: 1
+          NUMBA_DISABLE_TBB: 1
         run: |
-          # Install numba from the built conda package
-          conda install -c ${{ env.CONDA_CHANNEL_NUMBA }} -c defaults \
-            numpy=${{ matrix.numpy_test }} \
-            ./win-64/numba*.conda
-
           # Run tests directly with python -m numba.runtests
           echo "Running tests directly"
           python -m numba.runtests -v \
