@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ARTIFACT_RETENTION_DAYS: 7
+  ARTIFACT_RETENTION_DAYS: 30
   WHEELS_INDEX_URL: https://pypi.anaconda.org/numba/label/dev/simple
 
 jobs:
@@ -154,7 +154,19 @@ jobs:
           python -m pip install dist/*.whl
 
           # print Numba system information
-          python -m numba -s
+          mkdir -p debug_artifacts
+          python -m numba -s > debug_artifacts/system_info.txt 2>&1
 
           # run tests
-          python -m numba.runtests -m 4 -v
+          export NUMBA_DEBUG=1
+          export NUMBA_DUMP_OPTIMIZED=1
+          set -o pipefail
+          python -m numba.runtests -m 4 -v numba.tests.test_np_functions.TestNPFunctions.test_isin_2 2>&1 | tee debug_artifacts/test_isin_2.log
+
+      - name: Upload debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-64-debug-logs-py${{ matrix.python_canonical }}-np${{ matrix.numpy_test }}
+          path: debug_artifacts
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
