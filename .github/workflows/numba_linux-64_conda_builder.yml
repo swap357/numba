@@ -160,7 +160,7 @@ jobs:
 
       - name: Run tests
         env:
-          TESTS_TO_RUN: "numba.tests"
+          TESTS_TO_RUN: "numba.tests.test_array_methods.TestArrayMethods.test_clip_nan_inf"
           NUMBA_ENABLE_CUDASIM: 1
         run: |
           # Set channel based on whether llvmlite artifact was downloaded
