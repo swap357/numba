@@ -1728,6 +1728,27 @@ class TestArrayMethods(MemoryLeakMixin, TestCase):
 
                     self._lower_clip_result_test_util(cfunc, a, a_min, a_max)
 
+    def test_clip_nan_inf(self):
+        pyfuncs = (np_clip, array_clip)
+        a = np.array([1, 2], dtype=np.int64)
+        for pyfunc in pyfuncs:
+            cfunc = jit(nopython=True)(pyfunc)
+            # both bounds are +inf
+            np.testing.assert_equal(pyfunc(a, np.inf, np.inf), cfunc(a, np.inf, np.inf))
+            # both bounds are NaN
+            np.testing.assert_equal(pyfunc(a, np.nan, np.nan), cfunc(a, np.nan, np.nan))
+            # one bound is infinite
+            np.testing.assert_equal(pyfunc(a, -np.inf, 1), cfunc(a, -np.inf, 1))
+            np.testing.assert_equal(pyfunc(a, 1, np.inf), cfunc(a, 1, np.inf))
+            # swapped bounds with inf (min > max)
+            np.testing.assert_equal(pyfunc(a, np.inf, 1), cfunc(a, np.inf, 1))
+            # one bound is NaN
+            np.testing.assert_equal(pyfunc(a, np.nan, 1), cfunc(a, np.nan, 1))
+            np.testing.assert_equal(pyfunc(a, 1, np.nan), cfunc(a, 1, np.nan))
+            np.testing.assert_equal(pyfunc(a, -np.inf, np.nan), cfunc(a, -np.inf, np.nan))
+            np.testing.assert_equal(pyfunc(a, np.nan, np.inf), cfunc(a, np.nan, np.inf))
+            np.testing.assert_equal(pyfunc(a, np.inf, np.nan), cfunc(a, np.inf, np.nan))
+
     def test_clip_bad_array(self):
         cfunc = jit(nopython=True)(np_clip)
         msg = '.*The argument "a" must be array-like.*'
