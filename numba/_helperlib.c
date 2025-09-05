@@ -25,7 +25,7 @@
         #define _complex_float_ctor(r, i) (r + _Complex_I * i)
     #else
         #error "Lack _Imaginary_I and _Complex_I"
-    #endif 
+    #endif
     #define _complex_double_t complex double
 #endif
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
@@ -839,7 +839,7 @@ static void traceback_add(const char *funcname, const char *filename, int lineno
     if (!frame)
         goto error;
 
-#if (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION == 12) || (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION == 13) /* 3.12 or 3.13 */
+#if (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION == 12) || (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION == 13) || (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION == 14) /* 3.12 or 3.13 or 3.14 */
 #elif (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION == 11) /* 3.11 */
 
     /* unsafe cast to our copy of _frame to access the f_lineno field */
@@ -857,7 +857,7 @@ static void traceback_add(const char *funcname, const char *filename, int lineno
     Py_DECREF(frame);
     return;
 
-#if (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION == 12) || (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION == 13) /* 3.12 or 3.13 */
+#if (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION == 12) || (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION == 13) || (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION == 14) /* 3.12 or 3.13 or 3.14 */
 error:
     _PyErr_ChainExceptions1(exc);
 #elif (PY_MAJOR_VERSION == 3) && ((PY_MINOR_VERSION == 10) || (PY_MINOR_VERSION == 11)) /* 3.11 and below */
