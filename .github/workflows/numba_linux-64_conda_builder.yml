@@ -43,6 +43,8 @@ jobs:
     name: linux-64-build-conda (py ${{ matrix.python-version }}, np ${{ matrix.numpy_build }})
     needs: load-matrix
     runs-on: ubuntu-latest
+    env:
+      EXTRA_CHANNELS: ${{ matrix.python-version == '3.14' && '-c ad-testing/label/py314' || '' }}
     defaults:
       run:
         shell: bash -elx {0}
@@ -90,7 +92,7 @@ jobs:
             LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_NUMBA }}"
           fi
 
-          conda build --debug -c $LLVMLITE_CHANNEL -c defaults \
+          conda build --debug -c $LLVMLITE_CHANNEL ${EXTRA_CHANNELS} -c defaults \
             --python=${{ matrix.python-version }} \
             --numpy=${{ matrix.numpy_build }} blas=*=openblas \
             buildscripts/condarecipe.local/ \
@@ -110,6 +112,8 @@ jobs:
     name: linux-64-test-conda (py ${{ matrix.python-version }}, np ${{ matrix.numpy_test }})
     needs: [load-matrix, linux-64-build-conda]
     runs-on: ubuntu-latest
+    env:
+      EXTRA_CHANNELS: ${{ matrix.python-version == '3.14' && '-c ad-testing/label/py314' || '' }}
     defaults:
       run:
         shell: bash -elx {0}
@@ -170,7 +174,7 @@ jobs:
             LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_NUMBA }}"
           fi
 
-          conda build -c $LLVMLITE_CHANNEL -c defaults \
+          conda build -c $LLVMLITE_CHANNEL ${EXTRA_CHANNELS} -c defaults \
             --python=${{ matrix.python-version }} \
             --extra-deps numpy=${{ matrix.numpy_test }} blas=*=openblas \
             --test \
