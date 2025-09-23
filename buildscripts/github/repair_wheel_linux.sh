@@ -22,21 +22,11 @@ if [ "$USE_TBB" = "true" ]; then
 fi
 
 # 1) Find the libtbb that the pip wheel installed
-LIBTBB_DIR=$($PYTHON_EXECUTABLE - <<'PY'
-import site, glob, os, sys
-for d in site.getsitepackages():
-    cand = sorted(glob.glob(os.path.join(d, 'tbb', 'libtbb.so.*')))
-    if cand:
-        print(os.path.dirname(cand[0]))
-        sys.exit(0)
-print("")  # not found
-PY
-)
-
-if [ -z "$LIBTBB_DIR" ]; then
-  echo "Could not locate libtbb in site-packages. Did pip install tbb in cp311 env?" >&2
+LIBTBB_DIR="$("$PYTHON_EXECUTABLE" -c "import importlib, os, pathlib as p; m=importlib.import_module('tbb'); base=p.Path(m.__file__).resolve().parent; cand=list(base.rglob('libtbb.so*')); print((cand[0].parent if cand else base))")" || {
+  echo "Failed to locate libtbb in $PYBIN"
   exit 1
-fi
+}
+[ -n "$LIBTBB_DIR" ] || { echo "libtbb not found in $PYBIN"; exit 1; }
 
 echo "Found TBB libs in: $LIBTBB_DIR"
 ls -l "$LIBTBB_DIR"/libtbb.so.*
