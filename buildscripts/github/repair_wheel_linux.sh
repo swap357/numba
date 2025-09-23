@@ -21,6 +21,26 @@ if [ "$USE_TBB" = "true" ]; then
     $PYTHON_EXECUTABLE -m pip install tbb==2021.6 tbb-devel==2021.6
 fi
 
+# 1) Find the libtbb that the pip wheel installed
+LIBTBB_DIR=$($PYTHON_EXECUTABLE - <<'PY'
+import site, glob, os, sys
+for d in site.getsitepackages():
+    cand = sorted(glob.glob(os.path.join(d, 'tbb', 'libtbb.so.*')))
+    if cand:
+        print(os.path.dirname(cand[0]))
+        sys.exit(0)
+print("")  # not found
+PY
+)
+
+if [ -z "$LIBTBB_DIR" ]; then
+  echo "Could not locate libtbb in site-packages. Did pip install tbb in cp311 env?" >&2
+  exit 1
+fi
+
+echo "Found TBB libs in: $LIBTBB_DIR"
+ls -l "$LIBTBB_DIR"/libtbb.so.*
+
 # Make sure the wheelhouse directory exists
 mkdir -p $WHEEL_DIR
 
