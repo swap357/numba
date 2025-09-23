@@ -16,6 +16,11 @@ echo "WHEEL_DIR: $WHEEL_DIR"
 # Install required tools
 $PYTHON_EXECUTABLE -m pip install auditwheel patchelf twine wheel
 
+# Install TBB if enabled
+if [ "$USE_TBB" = "true" ]; then
+    $PYTHON_EXECUTABLE -m pip install tbb==2021.6 tbb-devel==2021.6
+fi
+
 # Make sure the wheelhouse directory exists
 mkdir -p $WHEEL_DIR
 

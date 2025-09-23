@@ -36,7 +36,7 @@ echo "Contents of /io directory:"
 ls -la
 
 # Build wheel from the workspace directory
-$PYTHON_EXECUTABLE -m build --wheel
+$PYTHON_EXECUTABLE -m build --wheel --no-isolation
 
 # Build sdist based on python version (check if path contains cp310-cp310)
 # Check relies on standard manylinux path structure like /opt/python/cp310-cp310/bin/python
