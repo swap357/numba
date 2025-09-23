@@ -19,17 +19,11 @@ $PYTHON_EXECUTABLE -m pip install auditwheel patchelf twine wheel
 # Install TBB if enabled
 if [ "$USE_TBB" = "true" ]; then
     $PYTHON_EXECUTABLE -m pip install tbb==2021.6 tbb-devel==2021.6
+    
+    # Make TBB libraries available to dynamic linker
+    find /opt /usr -name "libtbb.so*" -exec cp {} /usr/local/lib/ \; 2>/dev/null
+    ldconfig
 fi
-
-# 1) Find the libtbb that the pip wheel installed
-LIBTBB_DIR="$("$PYTHON_EXECUTABLE" -c "import importlib, os, pathlib as p; m=importlib.import_module('tbb'); base=p.Path(m.__file__).resolve().parent; cand=list(base.rglob('libtbb.so*')); print((cand[0].parent if cand else base))")" || {
-  echo "Failed to locate libtbb in $PYBIN"
-  exit 1
-}
-[ -n "$LIBTBB_DIR" ] || { echo "libtbb not found in $PYBIN"; exit 1; }
-
-echo "Found TBB libs in: $LIBTBB_DIR"
-ls -l "$LIBTBB_DIR"/libtbb.so.*
 
 # Make sure the wheelhouse directory exists
 mkdir -p $WHEEL_DIR
