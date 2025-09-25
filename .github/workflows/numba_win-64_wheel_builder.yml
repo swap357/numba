@@ -92,6 +92,55 @@ jobs:
           fi
           python -m pip install build numpy==${{ matrix.numpy_build }} setuptools wheel tbb==2021.6 tbb-devel==2021.6
 
+      - name: Export TBB env (discover include/lib/bin from the wheel)
+        shell: bash -el {0}
+        run: |
+          python - <<'PY'
+          import os, sys, site, glob, json
+          sp = (site.getsitepackages() or [sys.prefix + r'\Lib\site-packages'])[0]
+          def find(patterns):
+              hits = []
+              for pat in patterns:
+                  hits.extend(glob.glob(os.path.join(sp, '**', pat), recursive=True))
+              return hits
+          inc = None
+          for cand in find(['oneapi/tbb/tbb.h','tbb/tbb.h']):
+              inc = os.path.dirname(os.path.dirname(cand))  # .../include/oneapi or .../include/tbb
+              while os.path.basename(inc).lower() not in ('include',):
+                  inc = os.path.dirname(inc)
+              break
+          libs = find(['tbb*.lib'])
+          bins = find(['tbb*.dll'])
+          libdir = os.path.dirname(libs[0]) if libs else ''
+          bindir = os.path.dirname(bins[0]) if bins else ''
+          root = os.path.dirname(inc) if inc else sp
+          env = {
+            'TBBROOT': root.replace('/','\\'),
+            'TBB_INCLUDE_DIR': inc.replace('/','\\') if inc else '',
+            'TBB_LIBRARY_DIR': libdir.replace('/','\\'),
+            'ADD_PATH': bindir.replace('/','\\'),
+            'ADD_INCLUDE': inc.replace('/','\\') if inc else '',
+            'ADD_LIB': libdir.replace('/','\\')
+          }
+          for k,v in env.items(): print(f'{k}={v}')
+          open(os.environ['GITHUB_ENV'],'a').write('\n'.join(f'{k}={v}' for k,v in env.items() if v)+'\n')
+          # MSVC uses INCLUDE/LIB; append rather than replace
+          with open(os.environ['GITHUB_ENV'],'a') as f:
+              if env['ADD_INCLUDE']: f.write(f'INCLUDE={env["ADD_INCLUDE"]};%INCLUDE%\n')
+              if env['ADD_LIB']: f.write(f'LIB={env["ADD_LIB"]};%LIB%\n')
+          open(os.environ['GITHUB_PATH'],'a').write(('\n'+env['ADD_PATH']+'\n') if env['ADD_PATH'] else '')
+          PY
+
+      - name: Verify TBB detection inputs
+        shell: bash -el {0}
+        run: |
+          echo "TBBROOT=$TBBROOT"
+          echo "TBB_INCLUDE_DIR=$TBB_INCLUDE_DIR"
+          echo "TBB_LIBRARY_DIR=$TBB_LIBRARY_DIR"
+          ls "$TBB_INCLUDE_DIR" | sed -n '1,50p' || true
+          ls "$TBB_LIBRARY_DIR" || true
+          (ls "$ADD_PATH" | grep -i tbb || true)
+
       - name: Build wheel
         run: python -m build --wheel --no-isolation
 
