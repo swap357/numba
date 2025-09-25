@@ -7,6 +7,7 @@ on:
       - .github/workflows/wheel_workflow_matrix.json
       - buildscripts/github/build_wheel_linux.sh
       - buildscripts/github/repair_wheel_linux.sh
+      - buildscripts/github/validate_imports.py
   workflow_dispatch:
     inputs:
       llvmlite_wheel_runid:
@@ -137,6 +138,45 @@ jobs:
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
           if-no-files-found: error
 
+  linux-64-validate:
+    name: linux-64-validate
+    needs: [load-matrix, linux-64-build]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -elx {0}
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.load-matrix.outputs.build-matrix-json) }}
+      fail-fast: false
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install validation dependencies
+        run: |
+          python -m pip install --upgrade pip wheel twine lief
+
+      - name: Download Numba wheel artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: numba_linux-64_wheel_py${{ matrix.python_canonical }}
+          path: dist
+
+      - name: Validate wheels
+        run: |
+          cd dist
+          for WHL_FILE in *.whl; do
+            mkdir -p unpacked
+            wheel unpack "$WHL_FILE" -d unpacked
+            python "$GITHUB_WORKSPACE"/buildscripts/github/validate_imports.py --platform linux-64 --path unpacked
+            python -m twine check "$WHL_FILE"
+          done
 
   linux-64-test:
     name: linux-64-test (py ${{ matrix.python-version }}, np ${{ matrix.numpy_test }})

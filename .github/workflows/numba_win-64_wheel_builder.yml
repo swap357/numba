@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/numba_win-64_wheel_builder.yml
       - .github/workflows/wheel_workflow_matrix.json
+      - buildscripts/github/validate_imports.py
   workflow_dispatch:
     inputs:
       llvmlite_wheel_runid:
@@ -102,6 +103,47 @@ jobs:
           compression-level: 0
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
           if-no-files-found: error
+
+  win-64-validate:
+    name: win-64-validate
+    needs: [load-matrix, win-64-build]
+    runs-on: windows-2025
+    defaults:
+      run:
+        shell: bash -elx {0}
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.load-matrix.outputs.build-matrix-json) }}
+      fail-fast: false
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v4
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+          conda-remove-defaults: true
+          auto-update-conda: true
+          auto-activate-base: true
+
+      - name: Install validation dependencies
+        run: conda install -c defaults py-lief wheel twine keyring rfc3986
+
+      - name: Download Numba wheel artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: numba_win-64_wheel_py${{ matrix.python_canonical }}
+          path: dist
+
+      - name: Validate wheels
+        run: |
+          cd dist
+          for WHL_FILE in *.whl; do
+            wheel unpack "$WHL_FILE"
+            python "$GITHUB_WORKSPACE"/buildscripts/github/validate_imports.py --platform win-64 --path .
+            python -m twine check "$WHL_FILE"
+          done
 
   win-64-test:
     name: win-64-test-wheel (py ${{ matrix.python-version }}, np ${{ matrix.numpy_test }})
