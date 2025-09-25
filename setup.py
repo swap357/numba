@@ -213,9 +213,12 @@ def get_ext_modules():
         """
         found = None
         path2check = [os.path.split(os.path.split(sys.executable)[0])[0]]
+        print("initial path2check", path2check)
         path2check += [os.getenv(n, '') for n in ['CONDA_PREFIX', 'PREFIX']]
+        print("path2check - after CONDA_PREFIX and PREFIX", path2check)
         if sys.platform.startswith('win'):
             path2check += [os.path.join(p, 'Library') for p in path2check]
+            print("path2check - on windows", path2check)
         for p in path2check:
             if p:
                 if '*' in path2file:
