@@ -115,7 +115,7 @@ jobs:
           print("get_platform:", sysconfig.get_platform())
           print("cfg MACOSX_DEPLOYMENT_TARGET:", sysconfig.get_config_var("MACOSX_DEPLOYMENT_TARGET"))
           PY
-          arch -arm64 python -m build --wheel --no-isolation
+          MACOSX_DEPLOYMENT_TARGET=11.1 arch -arm64 python -m build --wheel --no-isolation
 
       - name: Fix macOS wheel library paths
         run: |
