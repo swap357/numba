@@ -66,14 +66,7 @@ jobs:
             python -m pip install numpy==${{ matrix.build.numpy_build }}
             if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
               python -m pip install tbb==2021.6 tbb-devel==2021.6
-              SITE=$(python -c "import sysconfig; print(sysconfig.get_paths().get('purelib') or sysconfig.get_paths().get('platlib'))")
-              if [ -d "$SITE/tbb/include/tbb" ]; then
-                export TBBROOT="$SITE/tbb"
-              elif [ -d "$SITE/tbb_devel/include/tbb" ]; then
-                export TBBROOT="$SITE/tbb_devel"
-              else
-                echo "TBB headers not found in site-packages"; exit 1
-              fi
+              export TBBROOT=$(python -c "import sysconfig; p=sysconfig.get_paths(); print(p.get('data') or p.get('platlib') or p.get('purelib'))")
             fi
             python -m pip install -i https://pypi.anaconda.org/numba/label/dev/simple llvmlite
 
