@@ -106,7 +106,14 @@ jobs:
         run: arch -arm64 python -m build --sdist
 
       - name: Build wheel
-        run: arch -arm64 python -m build --wheel --no-isolation
+        run: |
+          python - <<'PY'
+          import platform, sysconfig
+          print("machine:", platform.machine())
+          print("get_platform:", sysconfig.get_platform())
+          print("cfg MACOSX_DEPLOYMENT_TARGET:", sysconfig.get_config_var("MACOSX_DEPLOYMENT_TARGET"))
+          PY
+          MACOSX_DEPLOYMENT_TARGET=11.1 arch -arm64 python setup.py bdist_wheel
 
       - name: Fix macOS wheel library paths
         run: |

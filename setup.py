@@ -215,23 +215,30 @@ def get_ext_modules():
         path2check = [os.path.split(os.path.split(sys.executable)[0])[0]]
         path2check += [os.path.dirname(sys.executable)]    # for GHA win toolcache: ...\Python\<ver>\x64
         path2check += [os.getenv(n, '') for n in ['CONDA_PREFIX', 'PREFIX']]
+        print("path2check:", path2check)
         if sys.platform.startswith('win'):
             path2check += [os.path.join(p, 'Library') for p in path2check]
         for p in path2check:
             if p:
                 if '*' in path2file:
                     globloc = path2file.index('*')
+                    print("globloc:", globloc)
                     searchroot = os.path.join(*path2file[:globloc])
+                    print("searchroot:", searchroot)
                     try:
                         potential_locs = os.listdir(os.path.join(p, searchroot))
+                        print("potential_locs:", potential_locs)
                     except BaseException:
                         continue
                     searchfor = path2file[globloc + 1:]
+                    print("searchfor:", searchfor)
                     for x in potential_locs:
                         potpath = os.path.join(p, searchroot, x, *searchfor)
+                        print("potpath:", potpath)
                         if os.path.isfile(potpath):
                             found = p  # the latest is used
                 elif os.path.isfile(os.path.join(p, *path2file)):
+                    print("isfile:", os.path.join(p, *path2file))
                     found = p  # the latest is used
         return found
 
