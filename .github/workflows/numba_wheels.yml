@@ -82,6 +82,43 @@ jobs:
           # On linux-64 only, provide TBBROOT pointing at the CPython prefix used by cibuildwheel
           CIBW_ENVIRONMENT_LINUX: ${{ matrix.os == 'ubuntu-latest' && format('PIP_EXTRA_INDEX_URL=https://pypi.anaconda.org/numba/label/dev/simple TBBROOT=/opt/python/{0}-{0}', matrix.build.python_tag) || 'PIP_EXTRA_INDEX_URL=https://pypi.anaconda.org/numba/label/dev/simple' }}
 
+          # Linux repair: do not vendor libs; remove numba.libs and patch SONAMEs
+          CIBW_REPAIR_WHEEL_COMMAND_LINUX: |
+            set -eux
+            WORK=$(mktemp -d)
+            cp {wheel} "$WORK/"
+            cd "$WORK"
+            python -m pip install -U wheel auditwheel patchelf
+            python -m auditwheel repair "$(basename {wheel})" -w "$WORK/wheelhouse"
+            cd "$WORK/wheelhouse"
+            WHL=$(ls -1 *.whl | head -1)
+            python -m wheel unpack "$WHL"
+            DIR=$(find . -maxdepth 1 -type d -name "numba-*" | head -1)
+            cd "$DIR"
+            if [ -d "numba.libs" ]; then
+              cd numba.libs
+              LIBTBB=$(ls libtbb* 2>/dev/null || true)
+              LIBGOMP=$(ls libgomp* 2>/dev/null || true)
+              cd ..
+              rm -rf numba.libs
+              if ls numba/np/ufunc/tbbpool*.so >/dev/null 2>&1; then
+                if [ -n "$LIBTBB" ]; then
+                  patchelf numba/np/ufunc/tbbpool*.so --replace-needed "$LIBTBB" libtbb.so.12 || true
+                  patchelf numba/np/ufunc/tbbpool*.so --remove-rpath || true
+                fi
+              fi
+              if ls numba/np/ufunc/omppool*.so >/dev/null 2>&1; then
+                if [ -n "$LIBGOMP" ]; then
+                  patchelf numba/np/ufunc/omppool*.so --replace-needed "$LIBGOMP" libgomp.so.1 || true
+                  patchelf numba/np/ufunc/omppool*.so --remove-rpath || true
+                fi
+              fi
+            fi
+            cd ..
+            rm -f *.whl
+            python -m wheel pack "$DIR"
+            mv *.whl {dest_dir}/
+
 
       - uses: actions/upload-artifact@v4
         with:
