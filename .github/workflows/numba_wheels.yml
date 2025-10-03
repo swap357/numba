@@ -60,7 +60,14 @@ jobs:
           CIBW_BUILD: "${{ matrix.build.python_tag }}-*"
 
           # Build prerequisites (Numba requires llvmlite present at build time)
-          CIBW_BEFORE_BUILD: "python -m pip install -U pip setuptools wheel && python -m pip install numpy==${{ matrix.build.numpy_build }} && python -m pip install -i https://pypi.anaconda.org/numba/label/dev/simple llvmlite"
+          CIBW_BEFORE_BUILD: |
+            set -eux
+            python -m pip install -U pip setuptools wheel
+            python -m pip install numpy==${{ matrix.build.numpy_build }}
+            if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
+              python -m pip install tbb==2021.6 tbb-devel==2021.6
+            fi
+            python -m pip install -i https://pypi.anaconda.org/numba/label/dev/simple llvmlite
 
           # Make the dev index available for dependency resolution during tests
           CIBW_ENVIRONMENT: "PIP_EXTRA_INDEX_URL=https://pypi.anaconda.org/numba/label/dev/simple"
@@ -113,6 +120,9 @@ jobs:
           . .venv/bin/activate || .venv\Scripts\activate
           python -m pip install -U pip
           python -m pip install numpy==${{ matrix.test.numpy_test }} pytest
+          if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
+            python -m pip install tbb==2021.6 tbb-devel==2021.6
+          fi
           python -m pip install dist/*.whl
           if [ "${{ runner.os }}" = "macOS" ]; then
             export DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix libomp)/lib
