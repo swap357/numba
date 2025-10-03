@@ -32,7 +32,7 @@ jobs:
           echo "test-matrix-json=$TEST_MATRIX_JSON" >> $GITHUB_OUTPUT
 
   build_wheels:
-    name: Build wheels on ${{ matrix.os }}
+    name: ${{ matrix.os }} (py ${{ matrix.build['python-version'] }}, np ${{ matrix.build.numpy_build }})
     needs: load-matrix
     runs-on: ${{ matrix.os }}
     strategy:
@@ -84,7 +84,7 @@ jobs:
           if-no-files-found: error
 
   test_wheels:
-    name: Test wheels on ${{ matrix.os }} (py ${{ matrix.test.python-version }})
+    name: ${{ matrix.os }} (py ${{ matrix.test.python-version }}, np ${{ matrix.test.numpy_test }})
     needs: [load-matrix, build_wheels]
     runs-on: ${{ matrix.os }}
     strategy:
