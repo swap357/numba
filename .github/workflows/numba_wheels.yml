@@ -164,10 +164,13 @@ jobs:
           . .venv/bin/activate || .venv\Scripts\activate
           python -m pip install -U pip
           python -m pip install numpy==${{ matrix.test.numpy_test }} pytest
-          if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
-            python -m pip install tbb==2021.6 tbb-devel==2021.6
-          fi
           python -m pip install dist/*.whl
+          if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
+            python -m pip install tbb
+            # Verify TBB threading layer
+            NUMBA_THREADING_LAYER=tbb python -c "import numba; numba.get_num_threads(); \
+            print(numba.threading_layer())"
+          fi
           if [ "${{ runner.os }}" = "macOS" ]; then
             export DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix libomp)/lib
           fi
