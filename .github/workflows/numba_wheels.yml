@@ -20,13 +20,16 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       build-matrix-json: ${{ steps.load_matrix_json.outputs.build-matrix-json }}
+      test-matrix-json: ${{ steps.load_matrix_json.outputs.test-matrix-json }}
     steps:
       - uses: actions/checkout@v5
       - id: load_matrix_json
         name: Load Workflow Matrix JSON
         run: |
           BUILD_MATRIX_JSON=$(jq -c .wheel_build_matrix .github/workflows/wheel_workflow_matrix.json)
+          TEST_MATRIX_JSON=$(jq -c '.wheel_test_matrix | map(. + {"python_tag": ("cp" + (."python-version" | split(".") | join("")))})' .github/workflows/wheel_workflow_matrix.json)
           echo "build-matrix-json=$BUILD_MATRIX_JSON" >> $GITHUB_OUTPUT
+          echo "test-matrix-json=$TEST_MATRIX_JSON" >> $GITHUB_OUTPUT
 
   build_wheels:
     name: Build wheels on ${{ matrix.os }}
@@ -65,20 +68,56 @@ jobs:
           # Align with existing macOS wheel target and include dev index
           CIBW_ENVIRONMENT_MACOS: "MACOSX_DEPLOYMENT_TARGET=11.1 PIP_EXTRA_INDEX_URL=https://pypi.anaconda.org/numba/label/dev/simple"
 
-          # Ensure OpenMP at test time on macOS runners
-          CIBW_BEFORE_TEST_MACOS: "brew install libomp || true"
-
-          # Minimal test setup and command
-          CIBW_TEST_REQUIRES: "numpy pytest"
-          CIBW_TEST_COMMAND: "python -m numba -s && python -m numba.runtests -m 4 -v"
-          CIBW_TEST_COMMAND_MACOS: "export DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix libomp)/lib && python -m numba -s && python -m numba.runtests -m 4 -v"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
+          name: wheels-${{ matrix.os }}-${{ matrix.build.python_tag }}
           path: ./wheelhouse/*.whl
           compression-level: 0
           if-no-files-found: error
+
+  test_wheels:
+    name: Test wheels on ${{ matrix.os }} (py ${{ matrix.test.python-version }})
+    needs: [load-matrix, build_wheels]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, ubuntu-22.04-arm]
+        test: ${{ fromJson(needs.load-matrix.outputs.test-matrix-json) }}
+
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.test['python-version'] }}
+          allow-prereleases: true
+
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.test.python_tag }}
+          path: dist
+
+      - name: Prepare macOS OpenMP
+        if: runner.os == 'macOS'
+        run: |
+          brew update || true
+          brew install libomp || true
+
+      - name: Install and test wheel
+        env:
+          PIP_EXTRA_INDEX_URL: https://pypi.anaconda.org/numba/label/dev/simple
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate || .venv\Scripts\activate
+          python -m pip install -U pip
+          python -m pip install numpy==${{ matrix.test.numpy_test }} pytest
+          python -m pip install dist/*.whl
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            export DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix libomp)/lib
+          fi
+          python -m numba -s
 
   build_sdist:
     name: Build source distribution
