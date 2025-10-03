@@ -58,6 +58,7 @@ jobs:
           CIBW_CONTAINER_ENGINE: "docker"
           CIBW_BUILD_VERBOSITY: "1"
           CIBW_BUILD: "${{ matrix.build.python_tag }}-*"
+          
 
           # Build prerequisites (Numba requires llvmlite present at build time)
           CIBW_BEFORE_BUILD: |
@@ -76,6 +77,8 @@ jobs:
           # Align with existing macOS wheel target and include dev index
           CIBW_ENVIRONMENT_MACOS: "MACOSX_DEPLOYMENT_TARGET=11.1 PIP_EXTRA_INDEX_URL=https://pypi.anaconda.org/numba/label/dev/simple"
 
+          # On linux-64 only, provide TBBROOT pointing at the CPython prefix used by cibuildwheel
+          CIBW_ENVIRONMENT_LINUX: ${{ matrix.os == 'ubuntu-latest' && format('PIP_EXTRA_INDEX_URL=https://pypi.anaconda.org/numba/label/dev/simple TBBROOT=/opt/python/{0}-{0}', matrix.build.python_tag) || 'PIP_EXTRA_INDEX_URL=https://pypi.anaconda.org/numba/label/dev/simple' }}
 
 
       - uses: actions/upload-artifact@v4
