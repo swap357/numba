@@ -160,21 +160,18 @@ jobs:
         env:
           PIP_EXTRA_INDEX_URL: https://pypi.anaconda.org/numba/label/dev/simple
         run: |
-          python -m venv .venv
-          . .venv/bin/activate || .venv\Scripts\activate
-          python -m pip install -U pip
-          python -m pip install numpy==${{ matrix.test.numpy_test }} pytest
-          python -m pip install dist/*.whl
-          if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
-            python -m pip install tbb
-            # Verify TBB threading layer
-            NUMBA_THREADING_LAYER=tbb python -c "import numba; numba.get_num_threads(); \
-            print(numba.threading_layer())"
+          PY=$(python -c 'import sys; print(sys.executable)')
+          $PY -m pip install -U pip
+          $PY -m pip install numpy==${{ matrix.test.numpy_test }} pytest
+          $PY -m pip install dist/*.whl
+          if [ "${{ runner.os }}" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
+            $PY -m pip install tbb
+            NUMBA_THREADING_LAYER=tbb $PY -c "import numba; numba.get_num_threads(); print(numba.threading_layer())"
           fi
           if [ "${{ runner.os }}" = "macOS" ]; then
             export DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix libomp)/lib
           fi
-          python -m numba -s
+          $PY -m numba -s
 
   build_sdist:
     name: Build source distribution
