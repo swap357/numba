@@ -46,6 +46,7 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.2.0
@@ -58,7 +59,6 @@ jobs:
           CIBW_CONTAINER_ENGINE: "docker"
           CIBW_BUILD_VERBOSITY: "1"
           CIBW_BUILD: "${{ matrix.build.python_tag }}-*"
-          
 
           # Build prerequisites (Numba requires llvmlite present at build time)
           CIBW_BEFORE_BUILD: |
