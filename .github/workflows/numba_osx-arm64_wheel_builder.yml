@@ -106,7 +106,14 @@ jobs:
         run: arch -arm64 python -m build --sdist
 
       - name: Build wheel
-        run: arch -arm64 python -m build --wheel --no-isolation
+        run: |
+          python - <<'PY'
+          import platform, sysconfig
+          print("machine:", platform.machine())
+          print("get_platform:", sysconfig.get_platform())
+          print("cfg MACOSX_DEPLOYMENT_TARGET:", sysconfig.get_config_var("MACOSX_DEPLOYMENT_TARGET"))
+          PY
+          MACOSX_DEPLOYMENT_TARGET=11.1 arch -arm64 python -m build --wheel --no-isolation
 
       - name: Fix macOS wheel library paths
         run: |
@@ -140,6 +147,9 @@ jobs:
     name: osx-arm64-test (py ${{ matrix.python-version }}, np ${{ matrix.numpy_test }})
     needs: [load-matrix, osx-arm64-build]
     runs-on: macos-14
+    env:
+      NUMBA_DIST_TEST: 1
+      TESTS_TO_RUN: "numba.tests.test_dist_validation"
     defaults:
       run:
         shell: bash -elx {0}
@@ -200,10 +210,10 @@ jobs:
               arch -arm64 python -m pip install -i ${{ env.WHEELS_INDEX_URL }} llvmlite
           fi
           arch -arm64 python -m twine check dist/*.whl
-          arch -arm64 python -m pip install dist/numba*.whl numpy==${{ matrix.numpy_test }}
+          arch -arm64 python -m pip install dist/numba*.whl numpy==${{ matrix.numpy_test }} lief
 
           # print Numba system information
           arch -arm64 python -m numba -s
 
           # run tests
-          arch -arm64 python -m numba.runtests -m 4 -v
+          arch -arm64 python -m numba.runtests $TESTS_TO_RUN -m 4 -v

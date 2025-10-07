@@ -145,6 +145,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       USE_TBB: ${{ github.event_name == 'workflow_dispatch' && inputs.use_tbb != false || true }}
+      NUMBA_DIST_TEST: 1
+      TESTS_TO_RUN: "numba.tests.test_dist_validation"
     defaults:
       run:
         shell: bash -elx {0}
@@ -188,7 +190,7 @@ jobs:
           fi
           $PYTHON_PATH -m twine check dist/*.whl
 
-          $PYTHON_PATH -m pip install dist/numba*.whl numpy==${{ matrix.numpy_test }} setuptools
+          $PYTHON_PATH -m pip install dist/numba*.whl numpy==${{ matrix.numpy_test }} setuptools lief
 
           if [ "$USE_TBB" = "true" ]; then
             $PYTHON_PATH -m pip install tbb
@@ -200,4 +202,4 @@ jobs:
           $PYTHON_PATH -m numba -s
 
           # run tests
-          $PYTHON_PATH -m numba.runtests -m 4 -v
+          $PYTHON_PATH -m numba.runtests $TESTS_TO_RUN -m 4 -v
