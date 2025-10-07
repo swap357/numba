@@ -429,8 +429,18 @@ def _load_expected_imports() -> dict[str, list[str]] | None:
     return entry.get("imports_by_ext", {})
 
 
+_PY_DLL_RE = re.compile(r"python3\d{2}\.dll", re.IGNORECASE)
+
+
+def _normalize_lib_name(name: str) -> str:
+    base = os.path.basename(name).lower()
+    if _PY_DLL_RE.fullmatch(base):
+        return "python3xx.dll"
+    return base
+
+
 def _canonicalize(names: set[str]) -> set[str]:
-    return {os.path.basename(n).lower() for n in names}
+    return {_normalize_lib_name(n) for n in names}
 
 
 _CPYTHON_TAG_RE = re.compile(r"cpython-3\d+")
@@ -488,7 +498,7 @@ class TestNumbaDistValidation(TestCase):
             if ext_name not in found:
                 continue
             got = found[ext_name]
-            exp = {os.path.basename(n).lower() for n in exp_libs}
+            exp = _canonicalize(set(exp_libs))
             if exp != got:
                 mismatches.append(
                     (
