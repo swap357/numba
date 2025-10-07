@@ -1,5 +1,4 @@
 import glob
-import json
 import os
 import re
 import platform
@@ -7,6 +6,346 @@ import unittest
 from typing import Any, Callable, Optional
 from numba.tests.support import TestCase
 
+EXPECTED_IMPORTS_BY_PLATFORM = {
+  "win-64": {
+    "imports_by_ext": {
+      "_dynfunc.cp310-win_amd64.pyd": [
+        "KERNEL32.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "python310.dll"
+      ],
+      "_helperlib.cp310-win_amd64.pyd": [
+        "KERNEL32.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "python310.dll"
+      ],
+      "_devicearray.cp310-win_amd64.pyd": [
+        "KERNEL32.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "python310.dll"
+      ],
+      "mviewbuf.cp310-win_amd64.pyd": [
+        "KERNEL32.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "python310.dll"
+      ],
+      "_dispatcher.cp310-win_amd64.pyd": [
+        "KERNEL32.dll",
+        "MSVCP140.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "python310.dll"
+      ],
+      "_internal.cp310-win_amd64.pyd": [
+        "KERNEL32.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "python310.dll"
+      ],
+      "omppool.cp310-win_amd64.pyd": [
+        "KERNEL32.dll",
+        "MSVCP140.dll",
+        "VCOMP140.DLL",
+        "VCRUNTIME140.dll",
+        "VCRUNTIME140_1.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "python310.dll"
+      ],
+      "workqueue.cp310-win_amd64.pyd": [
+        "KERNEL32.dll",
+        "MSVCP140.dll",
+        "VCRUNTIME140.dll",
+        "VCRUNTIME140_1.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "python310.dll"
+      ],
+      "tbbpool.cp310-win_amd64.pyd": [
+        "KERNEL32.dll",
+        "MSVCP140.dll",
+        "VCRUNTIME140.dll",
+        "VCRUNTIME140_1.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-math-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "python310.dll",
+        "tbb12.dll"
+      ],
+      "_num_threads.cp310-win_amd64.pyd": [
+        "KERNEL32.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "python310.dll"
+      ],
+      "_extras.cp310-win_amd64.pyd": [
+        "KERNEL32.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "python310.dll"
+      ],
+      "_typeconv.cp310-win_amd64.pyd": [
+        "KERNEL32.dll",
+        "MSVCP140.dll",
+        "VCRUNTIME140.dll",
+        "VCRUNTIME140_1.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "python310.dll"
+      ],
+      "_nrt_python.cp310-win_amd64.pyd": [
+        "KERNEL32.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "python310.dll"
+      ],
+      "_box.cp310-win_amd64.pyd": [
+        "KERNEL32.dll",
+        "VCRUNTIME140.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "python310.dll"
+      ]
+    },
+    "delay_imports_by_ext": {}
+  },
+  "linux-64": {
+    "imports_by_ext": {
+      "_devicearray.cpython-310-x86_64-linux-gnu.so": [
+        "libc.so.6",
+        "libgcc_s.so.1",
+        "libm.so.6",
+        "libpthread.so.0",
+        "libstdc++.so.6"
+      ],
+      "_dynfunc.cpython-310-x86_64-linux-gnu.so": [
+        "libc.so.6",
+        "libpthread.so.0"
+      ],
+      "_helperlib.cpython-310-x86_64-linux-gnu.so": [
+        "ld-linux-x86-64.so.2",
+        "libc.so.6",
+        "libm.so.6",
+        "libpthread.so.0"
+      ],
+      "mviewbuf.cpython-310-x86_64-linux-gnu.so": [
+        "libc.so.6",
+        "libpthread.so.0"
+      ],
+      "_dispatcher.cpython-310-x86_64-linux-gnu.so": [
+        "libc.so.6",
+        "libgcc_s.so.1",
+        "libm.so.6",
+        "libpthread.so.0",
+        "libstdc++.so.6"
+      ],
+      "_internal.cpython-310-x86_64-linux-gnu.so": [
+        "libc.so.6",
+        "libm.so.6",
+        "libpthread.so.0"
+      ],
+      "omppool.cpython-310-x86_64-linux-gnu.so": [
+        "ld-linux-x86-64.so.2",
+        "libc.so.6",
+        "libgcc_s.so.1",
+        "libgomp.so.1.0.0",
+        "libm.so.6",
+        "libpthread.so.0",
+        "libstdc++.so.6"
+      ],
+      "tbbpool.cpython-310-x86_64-linux-gnu.so": [
+        "ld-linux-x86-64.so.2",
+        "libc.so.6",
+        "libgcc_s.so.1",
+        "libm.so.6",
+        "libpthread.so.0",
+        "libstdc++.so.6",
+        "libtbb.so.12"
+      ],
+      "_num_threads.cpython-310-x86_64-linux-gnu.so": [
+        "ld-linux-x86-64.so.2",
+        "libc.so.6",
+        "libpthread.so.0"
+      ],
+      "workqueue.cpython-310-x86_64-linux-gnu.so": [
+        "ld-linux-x86-64.so.2",
+        "libc.so.6",
+        "libgcc_s.so.1",
+        "libm.so.6",
+        "libpthread.so.0",
+        "libstdc++.so.6"
+      ],
+      "_extras.cpython-310-x86_64-linux-gnu.so": [
+        "libc.so.6",
+        "libpthread.so.0"
+      ],
+      "_typeconv.cpython-310-x86_64-linux-gnu.so": [
+        "libc.so.6",
+        "libgcc_s.so.1",
+        "libm.so.6",
+        "libpthread.so.0",
+        "libstdc++.so.6"
+      ],
+      "_nrt_python.cpython-310-x86_64-linux-gnu.so": [
+        "libc.so.6",
+        "libgcc_s.so.1",
+        "libm.so.6",
+        "libpthread.so.0",
+        "libstdc++.so.6"
+      ],
+      "_box.cpython-310-x86_64-linux-gnu.so": [
+        "libc.so.6",
+        "libpthread.so.0"
+      ]
+    },
+    "delay_imports_by_ext": {}
+  },
+  "linux-aarch64": {
+    "imports_by_ext": {
+      "_dynfunc.cpython-310-aarch64-linux-gnu.so": [
+        "libc.so.6",
+        "libpthread.so.0"
+      ],
+      "_dispatcher.cpython-310-aarch64-linux-gnu.so": [
+        "libc.so.6",
+        "libgcc_s.so.1",
+        "libm.so.6",
+        "libpthread.so.0",
+        "libstdc++.so.6"
+      ],
+      "_devicearray.cpython-310-aarch64-linux-gnu.so": [
+        "libc.so.6",
+        "libgcc_s.so.1",
+        "libm.so.6",
+        "libpthread.so.0",
+        "libstdc++.so.6"
+      ],
+      "_helperlib.cpython-310-aarch64-linux-gnu.so": [
+        "libc.so.6",
+        "libm.so.6",
+        "libpthread.so.0"
+      ],
+      "mviewbuf.cpython-310-aarch64-linux-gnu.so": [
+        "libc.so.6",
+        "libpthread.so.0"
+      ],
+      "omppool.cpython-310-aarch64-linux-gnu.so": [
+        "libc.so.6",
+        "libgcc_s.so.1",
+        "libgomp.so.1.0.0",
+        "libm.so.6",
+        "libpthread.so.0",
+        "libstdc++.so.6"
+      ],
+      "_num_threads.cpython-310-aarch64-linux-gnu.so": [
+        "libc.so.6",
+        "libpthread.so.0"
+      ],
+      "_internal.cpython-310-aarch64-linux-gnu.so": [
+        "libc.so.6",
+        "libm.so.6",
+        "libpthread.so.0"
+      ],
+      "workqueue.cpython-310-aarch64-linux-gnu.so": [
+        "libc.so.6",
+        "libgcc_s.so.1",
+        "libm.so.6",
+        "libpthread.so.0",
+        "libstdc++.so.6"
+      ],
+      "_extras.cpython-310-aarch64-linux-gnu.so": [
+        "libc.so.6",
+        "libpthread.so.0"
+      ],
+      "_typeconv.cpython-310-aarch64-linux-gnu.so": [
+        "libc.so.6",
+        "libgcc_s.so.1",
+        "libm.so.6",
+        "libpthread.so.0",
+        "libstdc++.so.6"
+      ],
+      "_nrt_python.cpython-310-aarch64-linux-gnu.so": [
+        "libc.so.6",
+        "libgcc_s.so.1",
+        "libm.so.6",
+        "libpthread.so.0",
+        "libstdc++.so.6"
+      ],
+      "_box.cpython-310-aarch64-linux-gnu.so": [
+        "libc.so.6",
+        "libpthread.so.0"
+      ]
+    },
+    "delay_imports_by_ext": {}
+  },
+  "osx-arm64": {
+    "imports_by_ext": {
+      "_devicearray.cpython-310-darwin.so": [
+        "libSystem.B.dylib",
+        "libc++.1.dylib"
+      ],
+      "_dispatcher.cpython-310-darwin.so": [
+        "libSystem.B.dylib",
+        "libc++.1.dylib"
+      ],
+      "_dynfunc.cpython-310-darwin.so": [
+        "libSystem.B.dylib"
+      ],
+      "mviewbuf.cpython-310-darwin.so": [
+        "libSystem.B.dylib"
+      ],
+      "_helperlib.cpython-310-darwin.so": [
+        "libSystem.B.dylib"
+      ],
+      "workqueue.cpython-310-darwin.so": [
+        "libSystem.B.dylib",
+        "libc++.1.dylib"
+      ],
+      "_num_threads.cpython-310-darwin.so": [
+        "libSystem.B.dylib"
+      ],
+      "_internal.cpython-310-darwin.so": [
+        "libSystem.B.dylib"
+      ],
+      "omppool.cpython-310-darwin.so": [
+        "libSystem.B.dylib",
+        "libc++.1.dylib",
+        "libomp.dylib"
+      ],
+      "_extras.cpython-310-darwin.so": [
+        "libSystem.B.dylib"
+      ],
+      "_typeconv.cpython-310-darwin.so": [
+        "libSystem.B.dylib",
+        "libc++.1.dylib"
+      ],
+      "_nrt_python.cpython-310-darwin.so": [
+        "libSystem.B.dylib",
+        "libc++.1.dylib"
+      ],
+      "_box.cpython-310-darwin.so": [
+        "libSystem.B.dylib"
+      ]
+    },
+    "delay_imports_by_ext": {}
+  }
+}
 
 # Gate these tests behind an environment variable to ensure they only run for
 # distribution validation by maintainers.
@@ -83,16 +422,10 @@ def _platform_key() -> str | None:
 
 
 def _load_expected_imports() -> dict[str, list[str]] | None:
-    here = os.path.dirname(__file__)
-    json_path = os.path.join(here, "imports_by_extension.json")
-    if not os.path.exists(json_path):
-        return None
-    with open(json_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
     key = _platform_key()
     if key is None:
         return None
-    entry = data.get(key, {})
+    entry = EXPECTED_IMPORTS_BY_PLATFORM.get(key, {})
     return entry.get("imports_by_ext", {})
 
 
