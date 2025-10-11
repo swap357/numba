@@ -155,7 +155,7 @@ class TestBuild(TestCase):
                     "pthread",
                 ]),
                 "_helperlib.cpython-310-x86_64-linux-gnu.so": set([
-                    "ld-linux-x86-64.so.2",
+                    "ld-linux-x86-64",
                     "c",
                     "m",
                     "pthread",
@@ -177,7 +177,7 @@ class TestBuild(TestCase):
                     "pthread",
                 ]),
                 "omppool.cpython-310-x86_64-linux-gnu.so": set([
-                    "ld-linux-x86-64.so.2",
+                    "ld-linux-x86-64",
                     "c",
                     "gcc_s",
                     "gomp",
@@ -186,7 +186,7 @@ class TestBuild(TestCase):
                     "stdc++",
                 ]),
                 "tbbpool.cpython-310-x86_64-linux-gnu.so": set([
-                    "ld-linux-x86-64.so.2",
+                    "ld-linux-x86-64",
                     "c",
                     "gcc_s",
                     "m",
@@ -195,12 +195,12 @@ class TestBuild(TestCase):
                     "tbb",
                 ]),
                 "_num_threads.cpython-310-x86_64-linux-gnu.so": set([
-                    "ld-linux-x86-64.so.2",
+                    "ld-linux-x86-64",
                     "c",
                     "pthread",
                 ]),
                 "workqueue.cpython-310-x86_64-linux-gnu.so": set([
-                    "ld-linux-x86-64.so.2",
+                    "ld-linux-x86-64",
                     "c",
                     "gcc_s",
                     "m",
