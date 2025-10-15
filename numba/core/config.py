@@ -600,3 +600,4 @@ def reload_config():
     Reload the configuration from environment variables, if necessary.
     """
     _env_reloader.update()
+
