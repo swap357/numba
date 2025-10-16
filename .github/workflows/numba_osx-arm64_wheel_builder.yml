@@ -5,7 +5,6 @@ on:
     paths:
       - .github/workflows/numba_osx-arm64_wheel_builder.yml
       - .github/workflows/wheel_workflow_matrix.json
-      - setup.py
   workflow_dispatch:
     inputs:
       llvmlite_wheel_runid:
@@ -93,8 +92,8 @@ jobs:
           else
               arch -arm64 python -m pip install -i ${{ env.WHEELS_INDEX_URL }} llvmlite
           fi
-          conda install python-build llvm-openmp
-          python -m pip install numpy==${{ matrix.numpy_build }}
+          conda install -c defaults python-build numpy==${{ matrix.numpy_build }} clang_osx-arm64 clangxx_osx-arm64
+          conda install --yes llvm-openmp
 
       - name: Build sdist [once - py3.10]
         if: matrix.python-version == '3.10'
@@ -104,7 +103,7 @@ jobs:
         env:
           NUMBA_PACKAGE_FORMAT: "wheel"
           MACOSX_DEPLOYMENT_TARGET: "11.0"
-        run: arch -arm64 python -m build --wheel --no-isolation
+        run: arch -arm64 python -m build
 
       - name: Fix macOS wheel library paths
         run: |
@@ -162,7 +161,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
 
       - name: Download Numba wheel artifact
         uses: actions/download-artifact@v4
