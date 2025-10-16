@@ -93,8 +93,8 @@ jobs:
           else
               arch -arm64 python -m pip install -i ${{ env.WHEELS_INDEX_URL }} llvmlite
           fi
-          python -m pip install build numpy==${{ matrix.numpy_build }} setuptools wheel
-          conda install --yes llvm-openmp
+          conda install python-build setuptools wheel llvm-openmp
+          python -m pip install numpy==${{ matrix.numpy_build }}
 
       - name: Build sdist [once - py3.10]
         if: matrix.python-version == '3.10'
@@ -103,7 +103,8 @@ jobs:
       - name: Build wheel
         env:
           NUMBA_PACKAGE_FORMAT: "wheel"
-        run: arch -arm64 python -m build --wheel --no-isolation
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: arch -arm64 python -m build --wheel
 
       - name: Fix macOS wheel library paths
         run: |
