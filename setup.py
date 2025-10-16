@@ -227,6 +227,7 @@ def get_ext_modules():
         path2check += [os.getenv(n, '') for n in ['CONDA_PREFIX', 'PREFIX']]
         if sys.platform.startswith('win'):
             path2check += [os.path.join(p, 'Library') for p in path2check]
+        print(f'path2check: {path2check}')
         for p in path2check:
             if p:
                 if '*' in path2file:
@@ -234,6 +235,9 @@ def get_ext_modules():
                     searchroot = os.path.join(*path2file[:globloc])
                     try:
                         potential_locs = os.listdir(os.path.join(p, searchroot))
+                        print(f'searchroot: {searchroot}')
+                        print(f'potential_locs: {potential_locs}')
+                        print('--------------------------------')
                     except BaseException:
                         continue
                     searchfor = path2file[globloc + 1:]
