@@ -100,10 +100,6 @@ jobs:
           curl -L "https://repo.anaconda.com/pkgs/main/osx-arm64/llvm-openmp-19.1.7-h3b2fb71_2.tar.bz2" -o llvm-openmp.tar.bz2
           mkdir -p omp && tar -xjf llvm-openmp.tar.bz2 -C omp
 
-          # Create symlinks for setup.py OpenMP detection
-          mkdir -p omp/lib/clang/19/include
-          ln -s ${{ github.workspace }}/omp/include/omp.h omp/lib/clang/19/include/omp.h
-
           # Export environment vars for build to detect OpenMP
           echo "PREFIX=$PWD/omp" >> $GITHUB_ENV
           echo "CPPFLAGS=-I$PWD/omp/include" >> $GITHUB_ENV
