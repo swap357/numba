@@ -102,8 +102,7 @@ jobs:
 
           # Create symlinks for setup.py OpenMP detection
           mkdir -p omp/lib/clang/19/include
-          ln -s ../../../../include/omp.h omp/lib/clang/19/include/omp.h
-          ln -s libomp.dylib omp/lib/libiomp5.dylib
+          ln -s ${{ github.workspace }}/omp/include/omp.h omp/lib/clang/19/include/omp.h
 
           # Export environment vars for build to detect OpenMP
           echo "PREFIX=$PWD/omp" >> $GITHUB_ENV
