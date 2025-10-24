@@ -743,11 +743,42 @@ class TestBuild(TestCase):
         """Test that all expected extension modules are present."""
         info = get_ext_info()
         missing = info.get("Missing Extensions", [])
+        found_paths = info.get("Extension Module Paths", [])
+        
+        # Debug output
+        print("\n" + "=" * 70)
+        print("Extension Module Detection Debug Info:")
+        print("=" * 70)
+        print(f"Total extensions found: {len(found_paths)}")
+        print(f"Total extensions missing: {len(missing)}")
+        
+        if found_paths:
+            print("\nFound extension paths:")
+            for path in found_paths:
+                print(f"  ✓ {path}")
+        
+        if missing:
+            print("\nMissing extensions:")
+            for mod in missing:
+                print(f"  ✗ {mod}")
+                # Try to manually check if we can find this module
+                try:
+                    import importlib.util
+                    spec = importlib.util.find_spec(mod)
+                    print(f"     Manual find_spec result: {spec}")
+                    if spec:
+                        print(f"     spec.origin: {spec.origin}")
+                except Exception as e:
+                    print(f"     Manual find_spec error: {type(e).__name__}: {e}")
+        
+        print("=" * 70 + "\n")
 
         if missing:
             msg = (
                 f"Expected extension modules are missing:\n"
                 f"  {missing}\n\n"
+                f"Found {len(found_paths)} extensions, missing {len(missing)}.\n"
+                f"See debug output above for details.\n"
             )
             raise AssertionError(msg)
 

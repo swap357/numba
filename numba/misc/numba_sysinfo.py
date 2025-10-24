@@ -792,9 +792,18 @@ def get_ext_info():
 
     def find_extension_module(module_name):
         """Find the file path for an extension module"""
-        spec = importlib.util.find_spec(module_name)
-        if spec and spec.origin:
-            return spec.origin
+        try:
+            spec = importlib.util.find_spec(module_name)
+            if spec and spec.origin:
+                return spec.origin
+        except (ImportError, ModuleNotFoundError, ValueError, AttributeError) as e:
+            # find_spec can raise exceptions when parent modules have import
+            # issues (e.g., CUDA on non-CUDA systems). Return None to mark
+            # the extension as missing rather than failing.
+            # Debug: Log the exception for troubleshooting
+            if os.environ.get('NUMBA_DIST_TEST'):
+                print(f"[DEBUG] find_extension_module({module_name}): "
+                      f"{type(e).__name__}: {e}", file=sys.stderr)
         return None
 
     # Gather paths for all extensions
