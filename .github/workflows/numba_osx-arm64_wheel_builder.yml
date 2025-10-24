@@ -5,7 +5,6 @@ on:
     paths:
       - .github/workflows/numba_osx-arm64_wheel_builder.yml
       - .github/workflows/wheel_workflow_matrix.json
-      - setup.py
   workflow_dispatch:
     inputs:
       llvmlite_wheel_runid:
@@ -71,15 +70,10 @@ jobs:
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
+          python-version: ${{ matrix.python-version }}
           conda-remove-defaults: true
           auto-update-conda: true
           auto-activate-base: true
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
 
       - name: Download llvmlite wheel
         if: inputs.llvmlite_wheel_runid != ''
@@ -98,15 +92,32 @@ jobs:
           else
               arch -arm64 python -m pip install -i ${{ env.WHEELS_INDEX_URL }} llvmlite
           fi
-          python -m pip install build numpy==${{ matrix.numpy_build }} setuptools wheel
-          conda install --yes llvm-openmp
+          conda install -c defaults python-build numpy==${{ matrix.numpy_build }}
+
+      - name: Setup llvm-openmp for build
+        run: |
+          # Download and extract llvm-openmp conda package
+          curl -L "https://repo.anaconda.com/pkgs/main/osx-arm64/llvm-openmp-19.1.7-h3b2fb71_2.tar.bz2" -o llvm-openmp.tar.bz2
+          mkdir -p omp && tar -xjf llvm-openmp.tar.bz2 -C omp
+
+          # Create symlinks for setup.py OpenMP detection
+          mkdir -p omp/lib/clang/19/include
+          ln -s ${{ github.workspace }}/omp/include/omp.h omp/lib/clang/19/include/omp.h
+
+          # Export environment vars for build to detect OpenMP
+          echo "PREFIX=$PWD/omp" >> $GITHUB_ENV
+          echo "CPPFLAGS=-I$PWD/omp/include" >> $GITHUB_ENV
+          echo "LDFLAGS=-L$PWD/omp/lib" >> $GITHUB_ENV
 
       - name: Build sdist [once - py3.10]
         if: matrix.python-version == '3.10'
         run: arch -arm64 python -m build --sdist
 
       - name: Build wheel
-        run: arch -arm64 python -m build --wheel --no-isolation
+        env:
+          NUMBA_PACKAGE_FORMAT: "wheel"
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: arch -arm64 python -m build
 
       - name: Fix macOS wheel library paths
         run: |
@@ -164,7 +175,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
 
       - name: Download Numba wheel artifact
         uses: actions/download-artifact@v4
@@ -189,10 +199,13 @@ jobs:
           echo "Set DYLD_FALLBACK_LIBRARY_PATH to: $(brew --prefix libomp)/lib"
 
       - name: Validate and test wheel
+        env:
+          NUMBA_DIST_TEST: 1
+          TESTS_TO_RUN: "numba.tests.test_dist_validation"
         run: |
           PYTHON_PATH=$(which python${{ matrix.python_canonical }})
           "$PYTHON_PATH" -m venv .venv && source .venv/bin/activate
-          arch -arm64 python -m pip install --upgrade pip twine
+          arch -arm64 python -m pip install --upgrade pip twine lief
           ls -l dist
           if [ "${{ inputs.llvmlite_wheel_runid }}" != "" ]; then
               arch -arm64 python -m pip install llvmlite_wheels/*.whl
@@ -206,4 +219,4 @@ jobs:
           arch -arm64 python -m numba -s
 
           # run tests
-          arch -arm64 python -m numba.runtests -m 4 -v
+          arch -arm64 python -m numba.runtests $TESTS_TO_RUN -m 4 -v
