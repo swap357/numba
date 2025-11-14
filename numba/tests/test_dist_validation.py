@@ -507,7 +507,6 @@ class TestBuild(TestCase):
                     "c",
                     "gcc_s",
                     "m",
-                    "pthread",
                     "stdc++",
                 ]),
                 "_extras.cpython-310-x86_64-linux-gnu.so": set([
@@ -518,7 +517,6 @@ class TestBuild(TestCase):
                     "c",
                     "gcc_s",
                     "m",
-                    "pthread",
                     "stdc++",
                 ]),
                 "_nrt_python.cpython-310-x86_64-linux-gnu.so": set([
@@ -582,7 +580,6 @@ class TestBuild(TestCase):
                     "c",
                     "gcc_s",
                     "m",
-                    "pthread",
                     "stdc++",
                 ]),
                 "_extras.cpython-310-aarch64-linux-gnu.so": set([
@@ -593,7 +590,6 @@ class TestBuild(TestCase):
                     "c",
                     "gcc_s",
                     "m",
-                    "pthread",
                     "stdc++",
                 ]),
                 "_nrt_python.cpython-310-aarch64-linux-gnu.so": set([
