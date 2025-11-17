@@ -85,6 +85,7 @@ class TestBuild(TestCase):
                     "python310",
                     "vcomp140",
                     "vcruntime140",
+                    'vcruntime140_1',
                 ]),
                 "workqueue.cp310-win_amd64.pyd": set([
                     "api-ms-win-crt-heap-l1-1-0",
@@ -95,6 +96,7 @@ class TestBuild(TestCase):
                     "msvcp140",
                     "python310",
                     "vcruntime140",
+                    'vcruntime140_1',
                 ]),
                 "tbbpool.cp310-win_amd64.pyd": set([
                     "api-ms-win-crt-heap-l1-1-0",
@@ -106,6 +108,7 @@ class TestBuild(TestCase):
                     "python310",
                     "tbb12",
                     "vcruntime140",
+                    "vcruntime140_1",
                 ]),
                 "_num_threads.cp310-win_amd64.pyd": set([
                     "api-ms-win-crt-runtime-l1-1-0",
@@ -183,7 +186,6 @@ class TestBuild(TestCase):
                     "c",
                     "gcc_s",
                     "ld-linux-aarch64",
-                    "pthread",
                     "stdc++",
                 ]),
                 "mviewbuf.cpython-310-aarch64-linux-gnu.so": set([
@@ -202,7 +204,6 @@ class TestBuild(TestCase):
                     "c",
                     "gcc_s",
                     "ld-linux-aarch64",
-                    "pthread",
                     "stdc++",
                 ]),
             },
@@ -241,7 +242,6 @@ class TestBuild(TestCase):
                 "_typeconv.cpython-310-x86_64-linux-gnu.so": set([
                     "c",
                     "gcc_s",
-                    "pthread",
                     "stdc++",
                 ]),
                 "mviewbuf.cpython-310-x86_64-linux-gnu.so": set([
@@ -266,7 +266,6 @@ class TestBuild(TestCase):
                     "c",
                     "gcc_s",
                     "ld-linux-x86-64",
-                    "pthread",
                     "stdc++",
                 ]),
             },
