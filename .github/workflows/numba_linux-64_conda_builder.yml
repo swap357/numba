@@ -78,6 +78,7 @@ jobs:
           llvmlite-run-id: ${{ inputs.llvmlite_run_id }}
           platform: ${{ matrix.platform }}
           python-version: ${{ matrix.python-version }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install conda-build
         uses: ./.github/actions/install-conda-build
@@ -142,3 +143,4 @@ jobs:
           conda-channel-numba: ${{ fromJson(needs.load-matrix.outputs.config-json).conda_channel_numba }}
           extra-channels: ${{ matrix.extra_channels }}
           numba-artifact-name: numba_${{ matrix.platform }}_conda_py${{ matrix.python-version }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}

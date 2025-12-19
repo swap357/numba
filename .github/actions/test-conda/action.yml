@@ -25,6 +25,9 @@ inputs:
   numba-artifact-name:
     description: 'Name of the numba artifact to download'
     required: true
+  github-token:
+    description: 'GitHub token for authentication'
+    required: true
 runs:
   using: composite
   steps:
@@ -34,6 +37,7 @@ runs:
         llvmlite-run-id: ${{ inputs.llvmlite-run-id }}
         platform: ${{ inputs.platform }}
         python-version: ${{ inputs.python-version }}
+        github-token: ${{ inputs.github-token }}
 
     - name: Download numba artifact
       uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
