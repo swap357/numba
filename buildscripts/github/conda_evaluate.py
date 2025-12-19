@@ -2,7 +2,19 @@
 
 import json
 import os
+import sys
 from pathlib import Path
+
+# Add parent directory to path to import workflow_config
+sys.path.insert(0, str(Path(__file__).parent))
+from workflow_config import (
+    CONDA_CHANNEL_NUMBA,
+    WHEELS_INDEX_URL,
+    ARTIFACT_RETENTION_DAYS,
+    CONDA_SETUP_PYTHON_VERSION,
+    get_extra_channels,
+    get_platform_config,
+)
 
 
 event = os.environ.get("GITHUB_EVENT_NAME")
@@ -104,8 +116,15 @@ conda_test_matrix = {
 
 
 def add_platform(matrix, platform):
-    """Add platform field to each matrix entry."""
-    return [dict(item, platform=platform) for item in matrix]
+    """Add platform and extra_channels fields to each matrix entry."""
+    result = []
+    for item in matrix:
+        entry = dict(item, platform=platform)
+        # Add extra_channels based on python version
+        py_version = item.get("python-version", "")
+        entry["extra_channels"] = get_extra_channels(py_version)
+        result.append(entry)
+    return result
 
 print(
     "Deciding what to do based on event: "
@@ -170,14 +189,27 @@ else:
 build_matrix = add_platform(build_matrix, platform)
 test_matrix = add_platform(test_matrix, platform)
 
+# Get platform config
+platform_config = get_platform_config(platform)
+config = {
+    "runner": platform_config.get("runner", "ubuntu-latest"),
+    "conda_channel_numba": CONDA_CHANNEL_NUMBA,
+    "wheels_index_url": WHEELS_INDEX_URL,
+    "artifact_retention_days": ARTIFACT_RETENTION_DAYS,
+    "conda_setup_python_version": CONDA_SETUP_PYTHON_VERSION,
+}
+
 build_json = json.dumps(build_matrix)
 test_json = json.dumps(test_matrix)
+config_json = json.dumps(config)
 
 print(f"Build Matrix JSON: {build_json}")
 print(f"Test Matrix JSON: {test_json}")
+print(f"Config JSON: {config_json}")
 
 Path(os.environ["GITHUB_OUTPUT"]).write_text(
     f"build-matrix-json={build_json}\n"
     f"test-matrix-json={test_json}\n"
+    f"config-json={config_json}\n"
 )
 

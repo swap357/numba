@@ -1,0 +1,60 @@
+name: 'Build Wheel (Linux)'
+description: 'Build Numba wheel in manylinux docker container'
+inputs:
+  python-tag:
+    description: 'Python tag (e.g., cp310, cp311)'
+    required: true
+  numpy-build:
+    description: 'NumPy version for build (e.g., 2.0.2)'
+    required: true
+  use-tbb:
+    description: 'Use TBB (Threading Building Blocks)'
+    required: false
+    default: 'true'
+  wheels-index-url:
+    description: 'Wheels index URL for llvmlite'
+    required: false
+    default: 'https://pypi.anaconda.org/numba/label/dev/simple'
+  manylinux-image:
+    description: 'Manylinux image to use'
+    required: false
+    default: 'quay.io/pypa/manylinux2014_x86_64'
+runs:
+  using: composite
+  steps:
+    - name: Build wheel in manylinux docker container
+      shell: bash
+      run: |
+        PYTHON_EXECUTABLE="/opt/python/${{ inputs.python-tag }}-${{ inputs.python-tag }}/bin/python"
+        echo "Using Python executable: $PYTHON_EXECUTABLE"
+
+        mkdir -p dist wheelhouse
+
+        docker run --rm \
+          -v ${{ github.workspace }}:/io \
+          ${{ inputs.manylinux-image }} \
+          bash /io/buildscripts/github/build_wheel_linux.sh \
+          "${PYTHON_EXECUTABLE}" \
+          "${{ inputs.use-tbb }}" \
+          "${{ inputs.numpy-build }}" \
+          "/io/llvmlite_wheels" \
+          "${{ inputs.wheels-index-url }}"
+
+        ls -la wheelhouse/
+
+    - name: Repair and patch wheel in manylinux docker container
+      shell: bash
+      run: |
+        PYTHON_EXECUTABLE="/opt/python/${{ inputs.python-tag }}-${{ inputs.python-tag }}/bin/python"
+        echo "Using Python executable: $PYTHON_EXECUTABLE"
+
+        docker run --rm \
+          -v ${{ github.workspace }}:/io \
+          ${{ inputs.manylinux-image }} \
+          bash /io/buildscripts/github/repair_wheel_linux.sh \
+          "$PYTHON_EXECUTABLE" \
+          "${{ inputs.use-tbb }}" \
+          "/io/wheelhouse"
+
+        ls -la wheelhouse/
+

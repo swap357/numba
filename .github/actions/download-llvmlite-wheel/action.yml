@@ -1,0 +1,26 @@
+name: 'Download llvmlite Wheel'
+description: 'Download llvmlite wheel artifact from cross-repo workflow run'
+inputs:
+  llvmlite-wheel-runid:
+    description: 'llvmlite wheel workflow run ID (optional)'
+    required: false
+    default: ''
+  platform:
+    description: 'Platform identifier (linux-64, osx-arm64, win-64, linux-aarch64)'
+    required: true
+  python-canonical:
+    description: 'Canonical Python version (e.g., 3.10, 3.11)'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Download llvmlite wheel
+      if: ${{ inputs.llvmlite-wheel-runid != '' }}
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      with:
+        name: llvmlite-${{ inputs.platform }}-py${{ inputs.python-canonical }}
+        path: llvmlite_wheels
+        run-id: ${{ inputs.llvmlite-wheel-runid }}
+        repository: numba/llvmlite
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+

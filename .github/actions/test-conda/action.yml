@@ -1,0 +1,87 @@
+name: 'Test Conda Package'
+description: 'Test Numba conda package'
+inputs:
+  platform:
+    description: 'Platform identifier (linux-64, osx-arm64, win-64, linux-aarch64)'
+    required: true
+  python-version:
+    description: 'Python version (e.g., 3.10, 3.11)'
+    required: true
+  numpy-test:
+    description: 'NumPy version for test (e.g., 1.23)'
+    required: true
+  llvmlite-run-id:
+    description: 'llvmlite workflow run ID (optional)'
+    required: false
+    default: ''
+  conda-channel-numba:
+    description: 'Conda channel for numba (default: numba/label/dev)'
+    required: false
+    default: 'numba/label/dev'
+  extra-channels:
+    description: 'Extra conda channels (space-separated, e.g., "-c channel1 -c channel2")'
+    required: false
+    default: ''
+  numba-artifact-name:
+    description: 'Name of the numba artifact to download'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Download llvmlite artifact
+      uses: ./.github/actions/download-llvmlite-conda
+      with:
+        llvmlite-run-id: ${{ inputs.llvmlite-run-id }}
+        platform: ${{ inputs.platform }}
+        python-version: ${{ inputs.python-version }}
+
+    - name: Download numba artifact
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      with:
+        name: ${{ inputs.numba-artifact-name }}
+
+    - name: Install catchsegv
+      if: ${{ inputs.platform == 'linux-64' || inputs.platform == 'linux-aarch64' }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y glibc-tools
+        catchsegv --version
+
+    - name: Run tests
+      shell: bash
+      env:
+        TESTS_TO_RUN: "numba.tests"
+        NUMBA_ENABLE_CUDASIM: 1
+      run: |
+        # Set channel based on whether llvmlite artifact was downloaded
+        if [ "${{ inputs.llvmlite-run-id }}" != "" ]; then
+          if [ "${{ inputs.platform }}" = "win-64" ]; then
+            LLVMLITE_CHANNEL="${{ github.workspace }}/llvmlite_conda"
+          else
+            LLVMLITE_CHANNEL="file://${{ github.workspace }}/llvmlite_conda"
+          fi
+        else
+          LLVMLITE_CHANNEL="${{ inputs.conda-channel-numba }}"
+        fi
+
+        if [ -n "${{ inputs.extra-channels }}" ]; then
+          extra_args=(${{ inputs.extra-channels }})
+        else
+          extra_args=()
+        fi
+
+        if [ "${{ inputs.platform }}" = "win-64" ]; then
+          conda build -c $LLVMLITE_CHANNEL "${extra_args[@]}" -c defaults \
+            --python=${{ inputs.python-version }} \
+            --extra-deps numpy=${{ inputs.numpy-test }} \
+            --test \
+            ${{ inputs.platform }}/numba*.conda
+        else
+          conda build -c "${LLVMLITE_CHANNEL}" "${extra_args[@]}" -c defaults \
+            --python=${{ inputs.python-version }} \
+            --extra-deps numpy=${{ inputs.numpy-test }} blas=*=openblas \
+            --test \
+            ${{ inputs.platform }}/numba*.conda
+        fi
+
