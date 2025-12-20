@@ -5,7 +5,7 @@ on:
     paths:
       - .github/workflows/numba_linux-64_conda_builder.yml
       - buildscripts/condarecipe.local/**
-      - .github/workflows/conda_workflow_matrix.json
+      - buildscripts/github/conda_evaluate.py
   workflow_dispatch:
     inputs:
       llvmlite_run_id:
@@ -25,19 +25,28 @@ jobs:
   load-matrix:
     runs-on: ubuntu-latest
     outputs:
-      build-matrix-json: ${{ steps.parse_matrix.outputs.build-matrix-json }}
-      test-matrix-json: ${{ steps.parse_matrix.outputs.test-matrix-json }}
+      build-matrix-json: ${{ steps.evaluate.outputs.build-matrix-json }}
+      test-matrix-json: ${{ steps.evaluate.outputs.test-matrix-json }}
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-      - id: parse_matrix
-        name: Parse Workflow Matrix JSON
+      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: '3.14'
+      - name: Evaluate
+        id: evaluate
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_WORKFLOW_INPUT: ${{ toJson(github.event.inputs) }}
+          GITHUB_PLATFORM: linux-64
         run: |
-          BUILD_JSON=$(jq -c .conda_build_matrix .github/workflows/conda_workflow_matrix.json)
-          TEST_JSON=$(jq -c .conda_test_matrix .github/workflows/conda_workflow_matrix.json)
-          echo "Build Matrix JSON: $BUILD_JSON"
-          echo "Test Matrix JSON: $TEST_JSON"
-          echo "build-matrix-json=$BUILD_JSON" >> $GITHUB_OUTPUT
-          echo "test-matrix-json=$TEST_JSON" >> $GITHUB_OUTPUT
+          set -ex
+          echo "=== Environment ==="
+          echo "Event: $GITHUB_EVENT_NAME"
+          echo "Inputs: $GITHUB_WORKFLOW_INPUT"
+          echo "Platform: $GITHUB_PLATFORM"
+          echo "=== Running evaluation script ==="
+          ./buildscripts/github/conda_evaluate.py
+          echo "=== Evaluation completed ==="
 
   linux-64-build-conda:
     name: linux-64-build-conda (py ${{ matrix.python-version }}, np ${{ matrix.numpy_build }})
