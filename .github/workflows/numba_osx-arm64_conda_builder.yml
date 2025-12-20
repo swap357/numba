@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - .github/workflows/numba_osx-arm64_conda_builder.yml
+      - .github/actions/**
       - buildscripts/condarecipe.local/**
       - buildscripts/github/conda_evaluate.py
+      - buildscripts/github/workflow_config.py
   workflow_dispatch:
     inputs:
       llvmlite_run_id:
@@ -18,15 +20,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
-env:
-  CONDA_CHANNEL_NUMBA: numba/label/dev
-
 jobs:
   load-matrix:
     runs-on: ubuntu-latest
     outputs:
       build-matrix-json: ${{ steps.evaluate.outputs.build-matrix-json }}
       test-matrix-json: ${{ steps.evaluate.outputs.test-matrix-json }}
+      config-json: ${{ steps.evaluate.outputs.config-json }}
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
@@ -51,9 +51,7 @@ jobs:
   osx-arm64-build-conda:
     name: osx-arm64-build-conda (py ${{ matrix.python-version }}, np ${{ matrix.numpy_build }})
     needs: load-matrix
-    runs-on: macos-14
-    env:
-      EXTRA_CHANNELS: ${{ matrix.python-version == '3.14' && '-c ad-testing/label/py314' || '' }}
+    runs-on: ${{ fromJson(needs.load-matrix.outputs.config-json).runner }}
     defaults:
       run:
         shell: bash -elx {0}
@@ -68,67 +66,48 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@835234971496cad1653abb28a638a281cf32541f # v3.2.0
+      - name: Setup Conda Environment
+        uses: ./.github/actions/setup-conda-env
         with:
-          python-version: 3.12
-          auto-update-conda: true
-          auto-activate-base: true
-          activate-environment: true
+          platform: ${{ matrix.platform }}
+          python-version: ${{ fromJson(needs.load-matrix.outputs.config-json).conda_setup_python_version }}
 
       - name: Download llvmlite Artifact
-        if: ${{ inputs.llvmlite_run_id != '' }}
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        uses: ./.github/actions/download-llvmlite-conda
         with:
-          name: llvmlite-osx-arm64-py${{ matrix.python-version }}
-          path: llvmlite_conda
-          run-id: ${{ inputs.llvmlite_run_id }}
-          repository: numba/llvmlite
+          llvmlite-run-id: ${{ inputs.llvmlite_run_id }}
+          platform: ${{ matrix.platform }}
+          python-version: ${{ matrix.python-version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install conda-build
-        run: conda install conda-build "conda-libmamba-solver<25.11"
+        uses: ./.github/actions/install-conda-build
+        with:
+          platform: ${{ matrix.platform }}
 
       - name: Build Numba conda package
-        run: |
-          CONDA_CHANNEL_DIR="conda_channel_dir"
-          mkdir -p $CONDA_CHANNEL_DIR
-
-          # Set channel based on whether llvmlite artifact was downloaded
-          if [ "${{ inputs.llvmlite_run_id }}" != "" ]; then
-            LLVMLITE_CHANNEL="file://${{ github.workspace }}/llvmlite_conda"
-          else
-            LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_NUMBA }}"
-          fi
-
-          if [ -n "${EXTRA_CHANNELS}" ]; then
-            extra_args=(${EXTRA_CHANNELS})
-          else
-            extra_args=()
-          fi
-
-          conda build --debug -c $LLVMLITE_CHANNEL "${extra_args[@]}" -c defaults \
-            --python=${{ matrix.python-version }} \
-            --numpy=${{ matrix.numpy_build }} blas=*=openblas \
-            buildscripts/condarecipe.local/ \
-            --output-folder=$CONDA_CHANNEL_DIR \
-            --no-test
+        uses: ./.github/actions/build-conda
+        with:
+          platform: ${{ matrix.platform }}
+          python-version: ${{ matrix.python-version }}
+          numpy-build: ${{ matrix.numpy_build }}
+          llvmlite-run-id: ${{ inputs.llvmlite_run_id }}
+          conda-channel-numba: ${{ fromJson(needs.load-matrix.outputs.config-json).conda_channel_numba }}
+          extra-channels: ${{ matrix.extra_channels }}
 
       - name: Upload numba conda package
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
-          name: numba_osx-arm64_conda_py${{ matrix.python-version }}
+          name: numba_${{ matrix.platform }}_conda_py${{ matrix.python-version }}
           path: conda_channel_dir
           compression-level: 0
-          retention-days: 7
+          retention-days: ${{ fromJson(needs.load-matrix.outputs.config-json).artifact_retention_days }}
           if-no-files-found: error
 
-  osx-arm64-test:
+  osx-arm64-test-conda:
     name: osx-arm64-test-conda (py ${{ matrix.python-version }}, np ${{ matrix.numpy_test }})
     needs: [load-matrix, osx-arm64-build-conda]
-    runs-on: macos-14
-    env:
-      EXTRA_CHANNELS: ${{ matrix.python-version == '3.14' && '-c ad-testing/label/py314' || '' }}
+    runs-on: ${{ fromJson(needs.load-matrix.outputs.config-json).runner }}
     defaults:
       run:
         shell: bash -elx {0}
@@ -143,53 +122,25 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@835234971496cad1653abb28a638a281cf32541f # v3.2.0
+      - name: Setup Conda Environment
+        uses: ./.github/actions/setup-conda-env
         with:
-          python-version: 3.12
-          auto-update-conda: true
-          auto-activate-base: true
-          activate-environment: true
-
-      - name: Download llvmlite artifact
-        if: ${{ inputs.llvmlite_run_id != '' }}
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
-        with:
-          name: llvmlite-osx-arm64-py${{ matrix.python-version }}
-          path: llvmlite_conda
-          run-id: ${{ inputs.llvmlite_run_id }}
-          repository: numba/llvmlite
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download numba artifact
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
-        with:
-          name: numba_osx-arm64_conda_py${{ matrix.python-version }}
+          platform: ${{ matrix.platform }}
+          python-version: ${{ fromJson(needs.load-matrix.outputs.config-json).conda_setup_python_version }}
 
       - name: Install conda-build
-        run: |
-          conda install conda-build "conda-libmamba-solver<25.11"
+        uses: ./.github/actions/install-conda-build
+        with:
+          platform: ${{ matrix.platform }}
 
-      - name: Run tests
-        env:
-          TESTS_TO_RUN: "numba.tests"
-          NUMBA_ENABLE_CUDASIM: 1
-        run: |
-          # Set channel based on whether llvmlite artifact was downloaded
-          if [ "${{ inputs.llvmlite_run_id }}" != "" ]; then
-            LLVMLITE_CHANNEL="file://${{ github.workspace }}/llvmlite_conda"
-          else
-            LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_NUMBA }}"
-          fi
-
-          if [ -n "${EXTRA_CHANNELS}" ]; then
-            extra_args=(${EXTRA_CHANNELS})
-          else
-            extra_args=()
-          fi
-
-          conda build -c $LLVMLITE_CHANNEL "${extra_args[@]}" -c defaults \
-            --python=${{ matrix.python-version }} \
-            --extra-deps numpy=${{ matrix.numpy_test }} blas=*=openblas \
-            --test \
-            osx-arm64/numba*.conda
+      - name: Test Numba conda package
+        uses: ./.github/actions/test-conda
+        with:
+          platform: ${{ matrix.platform }}
+          python-version: ${{ matrix.python-version }}
+          numpy-test: ${{ matrix.numpy_test }}
+          llvmlite-run-id: ${{ inputs.llvmlite_run_id }}
+          conda-channel-numba: ${{ fromJson(needs.load-matrix.outputs.config-json).conda_channel_numba }}
+          extra-channels: ${{ matrix.extra_channels }}
+          numba-artifact-name: numba_${{ matrix.platform }}_conda_py${{ matrix.python-version }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
