@@ -1,0 +1,118 @@
+name: 'Test Wheel'
+description: 'Validate and test Numba wheel'
+inputs:
+  platform:
+    description: 'Platform identifier (linux-64, osx-arm64, win-64, linux-aarch64)'
+    required: true
+  python-version:
+    description: 'Python version (e.g., 3.10, 3.11)'
+    required: true
+  python-canonical:
+    description: 'Canonical Python version (e.g., 3.10, 3.11)'
+    required: true
+  numpy-test:
+    description: 'NumPy version for test (e.g., 1.23)'
+    required: true
+  llvmlite-wheel-runid:
+    description: 'llvmlite wheel workflow run ID (optional)'
+    required: false
+    default: ''
+  wheels-index-url:
+    description: 'Wheels index URL for llvmlite'
+    required: false
+    default: 'https://pypi.anaconda.org/numba/label/dev/simple'
+  use-tbb:
+    description: 'Use TBB (Threading Building Blocks)'
+    required: false
+    default: 'true'
+  numba-artifact-name:
+    description: 'Name of the numba wheel artifact to download'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Download Numba wheel artifact
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      with:
+        name: ${{ inputs.numba-artifact-name }}
+        path: dist
+
+    - name: Validate and test wheel
+      shell: bash
+      env:
+        NUMBA_CPU_NAME: ${{ inputs.platform == 'win-64' && 'generic' || '' }}
+        _NUMBA_REDUCED_TESTING: ${{ inputs.platform == 'win-64' && '1' || '' }}
+      run: |
+        if [ "${{ inputs.platform }}" = "osx-arm64" ]; then
+          PYTHON_PATH=$(which python${{ inputs.python-canonical }})
+          "$PYTHON_PATH" -m venv .venv && source .venv/bin/activate
+          arch -arm64 python -m pip install --upgrade pip twine
+          ls -l dist
+          if [ "${{ inputs.llvmlite-wheel-runid }}" != "" ]; then
+              arch -arm64 python -m pip install llvmlite_wheels/*.whl
+          else
+              arch -arm64 python -m pip install -i ${{ inputs.wheels-index-url }} llvmlite
+          fi
+          arch -arm64 python -m twine check dist/*.whl
+          arch -arm64 python -m pip install dist/numba*.whl numpy==${{ inputs.numpy-test }}
+
+          arch -arm64 python -m numba -s
+          arch -arm64 python -m numba.runtests -m 4 -v
+        elif [ "${{ inputs.platform }}" = "win-64" ]; then
+          python -m pip install --upgrade pip twine
+          python -m pip install numpy==${{ inputs.numpy-test }} tbb==2021.6 tbb-devel==2021.6
+          if [ "${{ inputs.llvmlite-wheel-runid }}" != "" ]; then
+              python -m pip install llvmlite_wheels/*.whl
+          else
+              python -m pip install -i ${{ inputs.wheels-index-url }} llvmlite
+          fi
+          python -m twine check dist/*.whl
+          python -m pip install dist/*.whl
+
+          _NPY_CMD='from numba.misc import numba_sysinfo;\
+                    sysinfo=numba_sysinfo.get_sysinfo();\
+                    print(sysinfo["NumPy AVX512_SKX detected"] and
+                          sysinfo["NumPy Version"]>="1.22")'
+          NUMPY_DETECTS_AVX512_SKX_NP_GT_122=$(python -c "$_NPY_CMD")
+          echo "NumPy >= 1.22 with AVX512_SKX detected: $NUMPY_DETECTS_AVX512_SKX_NP_GT_122"
+
+          if [[ "$NUMPY_DETECTS_AVX512_SKX_NP_GT_122" == "True" ]]; then
+              export NPY_DISABLE_CPU_FEATURES="AVX512_SKX"
+          fi
+
+          python -m numba -s
+          python -m numba.runtests -m 4 -v
+        else
+          # Linux
+          PYTHON_PATH=$(which python${{ inputs.python-canonical }})
+          $PYTHON_PATH -m pip install --upgrade pip twine
+          ls -l dist
+          if [ "${{ inputs.llvmlite-wheel-runid }}" != "" ]; then
+              $PYTHON_PATH -m pip install --no-cache-dir llvmlite_wheels/*.whl
+          else
+              $PYTHON_PATH -m pip install --no-cache-dir -i ${{ inputs.wheels-index-url }} llvmlite
+          fi
+          $PYTHON_PATH -m twine check dist/*.whl
+
+          $PYTHON_PATH -m pip install dist/numba*.whl numpy==${{ inputs.numpy-test }} setuptools
+
+          if [ "${{ inputs.use-tbb }}" = "true" ]; then
+            $PYTHON_PATH -m pip install tbb
+            NUMBA_THREADING_LAYER=tbb $PYTHON_PATH -c "import numba; numba.get_num_threads(); print(numba.threading_layer())"
+          fi
+
+          _NPY_CMD='from numba.misc import numba_sysinfo;\
+                    sysinfo=numba_sysinfo.get_sysinfo();\
+                    print(sysinfo["NumPy AVX512_SKX detected"] and
+                          sysinfo["NumPy Version"]>="1.22")'
+          NUMPY_DETECTS_AVX512_SKX_NP_GT_122=$($PYTHON_PATH -c "$_NPY_CMD")
+          echo "NumPy >= 1.22 with AVX512_SKX detected: $NUMPY_DETECTS_AVX512_SKX_NP_GT_122"
+
+          if [[ "$NUMPY_DETECTS_AVX512_SKX_NP_GT_122" == "True" ]]; then
+              export NPY_DISABLE_CPU_FEATURES="AVX512_SKX"
+          fi
+
+          $PYTHON_PATH -m numba -s
+          $PYTHON_PATH -m numba.runtests -m 4 -v
+        fi
+
