@@ -1,0 +1,414 @@
+#!/usr/bin/env python3
+"""
+NumPy vs Numba Benchmark Harness
+
+Compares performance of NumPy functions against Numba-compiled equivalents.
+Designed for low-jitter measurements with CPU pinning.
+
+Usage:
+    python harness.py --cpu 7 --sizes 1000,10000,100000,1000000
+    taskset -c 7 python harness.py  # Alternative CPU pinning
+"""
+
+import os
+import sys
+
+# Add script directory to path for benchmark imports
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+if _script_dir not in sys.path:
+    sys.path.insert(0, _script_dir)
+
+import time
+import argparse
+import csv
+from datetime import datetime
+from dataclasses import dataclass, field
+from typing import Callable, List, Dict, Any, Optional
+import subprocess
+
+import numpy as np
+
+# Try to import numba - will be used for compilation
+try:
+    import numba
+    from numba import njit, prange
+    NUMBA_AVAILABLE = True
+except ImportError:
+    NUMBA_AVAILABLE = False
+    print("WARNING: Numba not available", file=sys.stderr)
+
+
+@dataclass
+class BenchmarkResult:
+    """Result of a single benchmark run."""
+    name: str
+    category: str
+    size: int
+    dtype: str
+    numpy_time_ns: float
+    numba_time_ns: float
+    speedup: float  # numpy_time / numba_time (>1 means numba faster)
+    numpy_result_hash: int  # For correctness check
+    numba_result_hash: int
+    correct: bool
+
+
+@dataclass
+class BenchmarkConfig:
+    """Configuration for benchmark runs."""
+    cpu: int = 7  # CPU to pin to
+    sizes: List[int] = field(default_factory=lambda: [1_000, 10_000, 100_000, 1_000_000])
+    dtypes: List[str] = field(default_factory=lambda: ['float64'])
+    warmup_runs: int = 3
+    timed_runs: int = 50
+    output_dir: str = 'results'
+
+
+def pin_to_cpu(cpu: int) -> bool:
+    """Pin current process to specified CPU core."""
+    try:
+        os.sched_setaffinity(0, {cpu})
+        # Verify
+        actual = os.sched_getaffinity(0)
+        if actual == {cpu}:
+            print(f"Pinned to CPU {cpu}")
+            return True
+        else:
+            print(f"WARNING: Affinity set to {actual}, expected {{{cpu}}}")
+            return False
+    except Exception as e:
+        print(f"WARNING: Could not pin to CPU {cpu}: {e}")
+        return False
+
+
+def set_high_priority() -> bool:
+    """Try to set high process priority."""
+    try:
+        os.nice(-10)
+        return True
+    except PermissionError:
+        # Not root, that's ok
+        return False
+
+
+def hash_result(arr: np.ndarray) -> int:
+    """Quick hash of array for correctness checking."""
+    if arr is None:
+        return 0
+    if np.isscalar(arr):
+        return hash(float(arr))
+    # Use a sample for large arrays
+    flat = np.asarray(arr).ravel()
+    if len(flat) > 1000:
+        indices = np.linspace(0, len(flat)-1, 1000, dtype=int)
+        sample = flat[indices]
+    else:
+        sample = flat
+    # Handle NaN/Inf
+    sample = np.nan_to_num(sample, nan=0.0, posinf=1e308, neginf=-1e308)
+    return hash(sample.tobytes())
+
+
+def time_function(func: Callable, args: tuple, warmup: int, runs: int) -> float:
+    """Time a function, return median time in nanoseconds."""
+    # Warmup
+    for _ in range(warmup):
+        func(*args)
+
+    # Timed runs
+    times = []
+    for _ in range(runs):
+        start = time.perf_counter_ns()
+        func(*args)
+        end = time.perf_counter_ns()
+        times.append(end - start)
+
+    # Return median (more robust than mean)
+    times.sort()
+    return times[len(times) // 2]
+
+
+def check_results_close(np_result, nb_result, rtol=1e-5, atol=1e-8) -> bool:
+    """Check if numpy and numba results are close enough."""
+    if np_result is None and nb_result is None:
+        return True
+    if np_result is None or nb_result is None:
+        return False
+
+    try:
+        np_arr = np.asarray(np_result)
+        nb_arr = np.asarray(nb_result)
+
+        if np_arr.shape != nb_arr.shape:
+            return False
+
+        return np.allclose(np_arr, nb_arr, rtol=rtol, atol=atol, equal_nan=True)
+    except Exception:
+        return False
+
+
+class Benchmark:
+    """Base class for benchmarks."""
+
+    def __init__(self, name: str, category: str):
+        self.name = name
+        self.category = category
+        self._numba_func = None
+
+    def setup(self, size: int, dtype: np.dtype) -> tuple:
+        """Create input data. Returns tuple of args."""
+        raise NotImplementedError
+
+    def numpy_impl(self, *args) -> Any:
+        """NumPy implementation."""
+        raise NotImplementedError
+
+    def numba_impl(self, *args) -> Any:
+        """Numba implementation (will be JIT compiled)."""
+        raise NotImplementedError
+
+    def get_numba_func(self) -> Callable:
+        """Get or create JIT-compiled function."""
+        if self._numba_func is None:
+            self._numba_func = njit(self.numba_impl, cache=True, fastmath=True)
+        return self._numba_func
+
+    def run(self, config: BenchmarkConfig, size: int, dtype: str) -> BenchmarkResult:
+        """Run the benchmark for given size and dtype."""
+        np_dtype = getattr(np, dtype)
+        args = self.setup(size, np_dtype)
+
+        # Get numba function (triggers compilation on first call)
+        numba_func = self.get_numba_func()
+
+        # Warmup numba (includes compilation)
+        for _ in range(config.warmup_runs):
+            numba_func(*args)
+
+        # Time numpy
+        numpy_time = time_function(
+            self.numpy_impl, args,
+            config.warmup_runs, config.timed_runs
+        )
+
+        # Time numba
+        numba_time = time_function(
+            numba_func, args,
+            config.warmup_runs, config.timed_runs
+        )
+
+        # Check correctness
+        np_result = self.numpy_impl(*args)
+        nb_result = numba_func(*args)
+        correct = check_results_close(np_result, nb_result)
+
+        speedup = numpy_time / numba_time if numba_time > 0 else float('inf')
+
+        return BenchmarkResult(
+            name=self.name,
+            category=self.category,
+            size=size,
+            dtype=dtype,
+            numpy_time_ns=numpy_time,
+            numba_time_ns=numba_time,
+            speedup=speedup,
+            numpy_result_hash=hash_result(np_result),
+            numba_result_hash=hash_result(nb_result),
+            correct=correct
+        )
+
+
+# Import registry from separate module to avoid circular import issues
+from registry import BENCHMARKS, register_benchmark
+
+
+def run_benchmarks(config: BenchmarkConfig, categories: Optional[List[str]] = None) -> List[BenchmarkResult]:
+    """Run all registered benchmarks."""
+    results = []
+
+    if categories is None:
+        categories = list(BENCHMARKS.keys())
+
+    total = sum(
+        len(BENCHMARKS[cat]) * len(config.sizes) * len(config.dtypes)
+        for cat in categories
+    )
+    current = 0
+
+    for category in categories:
+        benchmarks = BENCHMARKS[category]
+        for bench in benchmarks:
+            for dtype in config.dtypes:
+                for size in config.sizes:
+                    current += 1
+                    print(f"[{current}/{total}] {bench.name} size={size} dtype={dtype}...", end=' ', flush=True)
+
+                    try:
+                        result = bench.run(config, size, dtype)
+                        results.append(result)
+
+                        status = "OK" if result.correct else "MISMATCH"
+                        print(f"{status} speedup={result.speedup:.2f}x")
+                    except Exception as e:
+                        print(f"ERROR: {e}")
+
+    return results
+
+
+def results_to_markdown(results: List[BenchmarkResult]) -> str:
+    """Convert results to markdown table."""
+    lines = [
+        "# NumPy vs Numba Benchmark Results",
+        "",
+        f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        f"**Numba version:** {numba.__version__ if NUMBA_AVAILABLE else 'N/A'}",
+        f"**NumPy version:** {np.__version__}",
+        "",
+        "## Results",
+        "",
+        "| Category | Function | Size | Dtype | NumPy (us) | Numba (us) | Speedup | Correct |",
+        "|----------|----------|------|-------|------------|------------|---------|---------|",
+    ]
+
+    for r in results:
+        np_us = r.numpy_time_ns / 1000
+        nb_us = r.numba_time_ns / 1000
+        speedup_str = f"{r.speedup:.2f}x"
+        if r.speedup > 1:
+            speedup_str = f"**{speedup_str}**"
+        correct = "Yes" if r.correct else "**NO**"
+
+        lines.append(
+            f"| {r.category} | {r.name} | {r.size:,} | {r.dtype} | "
+            f"{np_us:.1f} | {nb_us:.1f} | {speedup_str} | {correct} |"
+        )
+
+    return "\n".join(lines)
+
+
+def results_to_csv(results: List[BenchmarkResult], path: str):
+    """Save results to CSV."""
+    with open(path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            'category', 'name', 'size', 'dtype',
+            'numpy_time_ns', 'numba_time_ns', 'speedup', 'correct'
+        ])
+        for r in results:
+            writer.writerow([
+                r.category, r.name, r.size, r.dtype,
+                r.numpy_time_ns, r.numba_time_ns, r.speedup, r.correct
+            ])
+
+
+def print_summary(results: List[BenchmarkResult]):
+    """Print summary statistics."""
+    if not results:
+        print("No results to summarize")
+        return
+
+    print("\n" + "="*60)
+    print("SUMMARY")
+    print("="*60)
+
+    # Group by category
+    by_category = {}
+    for r in results:
+        by_category.setdefault(r.category, []).append(r)
+
+    for category, cat_results in by_category.items():
+        speedups = [r.speedup for r in cat_results]
+        correct = sum(1 for r in cat_results if r.correct)
+
+        print(f"\n{category.upper()}:")
+        print(f"  Benchmarks: {len(cat_results)}")
+        print(f"  Correct: {correct}/{len(cat_results)}")
+        print(f"  Speedup - min: {min(speedups):.2f}x, max: {max(speedups):.2f}x, median: {sorted(speedups)[len(speedups)//2]:.2f}x")
+
+        # Find best/worst
+        fastest_numba = max(cat_results, key=lambda r: r.speedup)
+        slowest_numba = min(cat_results, key=lambda r: r.speedup)
+        print(f"  Best for Numba: {fastest_numba.name} ({fastest_numba.speedup:.2f}x)")
+        print(f"  Best for NumPy: {slowest_numba.name} ({slowest_numba.speedup:.2f}x)")
+
+
+def main():
+    parser = argparse.ArgumentParser(description='NumPy vs Numba Benchmark')
+    parser.add_argument('--cpu', type=int, default=7, help='CPU to pin to (default: 7)')
+    parser.add_argument('--sizes', type=str, default='1000,10000,100000,1000000',
+                       help='Comma-separated array sizes')
+    parser.add_argument('--dtypes', type=str, default='float64',
+                       help='Comma-separated dtypes')
+    parser.add_argument('--runs', type=int, default=50, help='Timed runs per benchmark')
+    parser.add_argument('--warmup', type=int, default=3, help='Warmup runs')
+    parser.add_argument('--categories', type=str, default=None,
+                       help='Comma-separated categories to run (default: all)')
+    parser.add_argument('--output', type=str, default='results',
+                       help='Output directory')
+    parser.add_argument('--no-pin', action='store_true', help='Disable CPU pinning')
+
+    args = parser.parse_args()
+
+    # Setup config
+    config = BenchmarkConfig(
+        cpu=args.cpu,
+        sizes=[int(s) for s in args.sizes.split(',')],
+        dtypes=args.dtypes.split(','),
+        warmup_runs=args.warmup,
+        timed_runs=args.runs,
+        output_dir=args.output,
+    )
+
+    print("="*60)
+    print("NumPy vs Numba Benchmark Harness")
+    print("="*60)
+    print(f"NumPy version: {np.__version__}")
+    print(f"Numba version: {numba.__version__ if NUMBA_AVAILABLE else 'N/A'}")
+    print(f"Sizes: {config.sizes}")
+    print(f"Dtypes: {config.dtypes}")
+    print(f"Runs: {config.timed_runs} (warmup: {config.warmup_runs})")
+
+    # Pin to CPU
+    if not args.no_pin:
+        pin_to_cpu(config.cpu)
+
+    # Try high priority
+    set_high_priority()
+
+    # Import benchmarks (registers them)
+    from benchmarks import ufuncs, reductions
+
+    # Categories to run
+    categories = None
+    if args.categories:
+        categories = args.categories.split(',')
+
+    print(f"\nRegistered benchmarks:")
+    for cat, benchs in BENCHMARKS.items():
+        if benchs:
+            print(f"  {cat}: {len(benchs)}")
+
+    print("\nStarting benchmarks...\n")
+
+    # Run
+    results = run_benchmarks(config, categories)
+
+    # Summary
+    print_summary(results)
+
+    # Save results
+    os.makedirs(config.output_dir, exist_ok=True)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+    csv_path = os.path.join(config.output_dir, f'benchmark_{timestamp}.csv')
+    results_to_csv(results, csv_path)
+    print(f"\nResults saved to: {csv_path}")
+
+    md_path = os.path.join(config.output_dir, f'benchmark_{timestamp}.md')
+    with open(md_path, 'w') as f:
+        f.write(results_to_markdown(results))
+    print(f"Markdown saved to: {md_path}")
+
+
+if __name__ == '__main__':
+    main()
