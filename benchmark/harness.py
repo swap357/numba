@@ -28,6 +28,13 @@ import subprocess
 
 import numpy as np
 
+# Import statistical analysis modules
+from stats import TimingStats, compute_timing_stats, compare_with_significance, format_stats
+from reproducibility import (
+    SystemState, capture_system_state, format_system_state,
+    isolated_benchmark_environment, state_to_dict
+)
+
 # Try to import numba - will be used for compilation
 try:
     import numba
@@ -51,6 +58,11 @@ class BenchmarkResult:
     numpy_result_hash: int  # For correctness check
     numba_result_hash: int
     correct: bool
+    # Statistical analysis fields
+    numpy_stats: Optional[TimingStats] = None
+    numba_stats: Optional[TimingStats] = None
+    significant: bool = True  # Whether speedup difference is statistically significant
+    p_value: float = 0.0  # P-value from significance test
 
 
 @dataclass
@@ -109,8 +121,21 @@ def hash_result(arr: np.ndarray) -> int:
     return hash(sample.tobytes())
 
 
-def time_function(func: Callable, args: tuple, warmup: int, runs: int) -> float:
-    """Time a function, return median time in nanoseconds."""
+def time_function(func: Callable, args: tuple, warmup: int, runs: int,
+                  return_stats: bool = False) -> tuple:
+    """
+    Time a function with comprehensive statistics.
+
+    Args:
+        func: Function to time
+        args: Arguments to pass to function
+        warmup: Number of warmup runs
+        runs: Number of timed runs
+        return_stats: If True, return (TimingStats, raw_times), else (median, raw_times)
+
+    Returns:
+        Tuple of (median_or_stats, raw_times_list)
+    """
     # Warmup
     for _ in range(warmup):
         func(*args)
@@ -123,9 +148,14 @@ def time_function(func: Callable, args: tuple, warmup: int, runs: int) -> float:
         end = time.perf_counter_ns()
         times.append(end - start)
 
-    # Return median (more robust than mean)
-    times.sort()
-    return times[len(times) // 2]
+    if return_stats:
+        stats = compute_timing_stats(times)
+        return stats, times
+    else:
+        # Return median (more robust than mean)
+        times_sorted = sorted(times)
+        median = times_sorted[len(times_sorted) // 2]
+        return median, times
 
 
 def check_results_close(np_result, nb_result, rtol=1e-5, atol=1e-8) -> bool:
@@ -185,16 +215,18 @@ class Benchmark:
         for _ in range(config.warmup_runs):
             numba_func(*args)
 
-        # Time numpy
-        numpy_time = time_function(
+        # Time numpy with statistics
+        numpy_stats, numpy_times = time_function(
             self.numpy_impl, args,
-            config.warmup_runs, config.timed_runs
+            config.warmup_runs, config.timed_runs,
+            return_stats=True
         )
 
-        # Time numba
-        numba_time = time_function(
+        # Time numba with statistics
+        numba_stats, numba_times = time_function(
             numba_func, args,
-            config.warmup_runs, config.timed_runs
+            config.warmup_runs, config.timed_runs,
+            return_stats=True
         )
 
         # Check correctness
@@ -202,19 +234,27 @@ class Benchmark:
         nb_result = numba_func(*args)
         correct = check_results_close(np_result, nb_result)
 
-        speedup = numpy_time / numba_time if numba_time > 0 else float('inf')
+        # Calculate speedup using median
+        speedup = numpy_stats.median / numba_stats.median if numba_stats.median > 0 else float('inf')
+
+        # Statistical significance test
+        comparison = compare_with_significance(numpy_times, numba_times)
 
         return BenchmarkResult(
             name=self.name,
             category=self.category,
             size=size,
             dtype=dtype,
-            numpy_time_ns=numpy_time,
-            numba_time_ns=numba_time,
+            numpy_time_ns=numpy_stats.median,
+            numba_time_ns=numba_stats.median,
             speedup=speedup,
             numpy_result_hash=hash_result(np_result),
             numba_result_hash=hash_result(nb_result),
-            correct=correct
+            correct=correct,
+            numpy_stats=numpy_stats,
+            numba_stats=numba_stats,
+            significant=comparison.significant,
+            p_value=comparison.p_value
         )
 
 
@@ -255,20 +295,36 @@ def run_benchmarks(config: BenchmarkConfig, categories: Optional[List[str]] = No
     return results
 
 
-def results_to_markdown(results: List[BenchmarkResult]) -> str:
-    """Convert results to markdown table."""
+def results_to_markdown(results: List[BenchmarkResult],
+                        system_state: Optional[SystemState] = None) -> str:
+    """Convert results to markdown table with statistical details."""
     lines = [
         "# NumPy vs Numba Benchmark Results",
         "",
         f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M')}",
         f"**Numba version:** {numba.__version__ if NUMBA_AVAILABLE else 'N/A'}",
         f"**NumPy version:** {np.__version__}",
+    ]
+
+    # Add system state info if available
+    if system_state:
+        lines.extend([
+            f"**CPU:** {system_state.cpu_model}",
+            f"**Governor:** {system_state.cpu_governor}",
+        ])
+        if system_state.warnings:
+            lines.append("")
+            lines.append("### Reproducibility Warnings")
+            for w in system_state.warnings:
+                lines.append(f"- {w}")
+
+    lines.extend([
         "",
         "## Results",
         "",
-        "| Category | Function | Size | Dtype | NumPy (us) | Numba (us) | Speedup | Correct |",
-        "|----------|----------|------|-------|------------|------------|---------|---------|",
-    ]
+        "| Category | Function | Size | Dtype | NumPy (us) | Numba (us) | Speedup | CI 95% | Sig | Correct |",
+        "|----------|----------|------|-------|------------|------------|---------|--------|-----|---------|",
+    ])
 
     for r in results:
         np_us = r.numpy_time_ns / 1000
@@ -278,31 +334,63 @@ def results_to_markdown(results: List[BenchmarkResult]) -> str:
             speedup_str = f"**{speedup_str}**"
         correct = "Yes" if r.correct else "**NO**"
 
+        # CI info if available
+        if r.numba_stats:
+            ci_low = r.numba_stats.ci_lower / 1000
+            ci_high = r.numba_stats.ci_upper / 1000
+            ci_str = f"[{ci_low:.1f}, {ci_high:.1f}]"
+        else:
+            ci_str = "-"
+
+        sig_str = "Yes" if r.significant else "No"
+
         lines.append(
             f"| {r.category} | {r.name} | {r.size:,} | {r.dtype} | "
-            f"{np_us:.1f} | {nb_us:.1f} | {speedup_str} | {correct} |"
+            f"{np_us:.1f} | {nb_us:.1f} | {speedup_str} | {ci_str} | {sig_str} | {correct} |"
         )
+
+    # Add legend
+    lines.extend([
+        "",
+        "---",
+        "*CI 95%: 95% confidence interval for Numba timing (microseconds)*",
+        "*Sig: Statistical significance of speedup difference (p < 0.05)*",
+    ])
 
     return "\n".join(lines)
 
 
 def results_to_csv(results: List[BenchmarkResult], path: str):
-    """Save results to CSV."""
+    """Save results to CSV with full statistical details."""
     with open(path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow([
             'category', 'name', 'size', 'dtype',
-            'numpy_time_ns', 'numba_time_ns', 'speedup', 'correct'
+            'numpy_time_ns', 'numba_time_ns', 'speedup', 'correct',
+            'numpy_ci_lower', 'numpy_ci_upper', 'numpy_cv',
+            'numba_ci_lower', 'numba_ci_upper', 'numba_cv',
+            'significant', 'p_value'
         ])
         for r in results:
+            # Extract stats if available
+            np_ci_lower = r.numpy_stats.ci_lower if r.numpy_stats else ''
+            np_ci_upper = r.numpy_stats.ci_upper if r.numpy_stats else ''
+            np_cv = r.numpy_stats.cv if r.numpy_stats else ''
+            nb_ci_lower = r.numba_stats.ci_lower if r.numba_stats else ''
+            nb_ci_upper = r.numba_stats.ci_upper if r.numba_stats else ''
+            nb_cv = r.numba_stats.cv if r.numba_stats else ''
+
             writer.writerow([
                 r.category, r.name, r.size, r.dtype,
-                r.numpy_time_ns, r.numba_time_ns, r.speedup, r.correct
+                r.numpy_time_ns, r.numba_time_ns, r.speedup, r.correct,
+                np_ci_lower, np_ci_upper, np_cv,
+                nb_ci_lower, nb_ci_upper, nb_cv,
+                r.significant, r.p_value
             ])
 
 
 def print_summary(results: List[BenchmarkResult]):
-    """Print summary statistics."""
+    """Print summary statistics with statistical significance info."""
     if not results:
         print("No results to summarize")
         return
@@ -319,17 +407,31 @@ def print_summary(results: List[BenchmarkResult]):
     for category, cat_results in by_category.items():
         speedups = [r.speedup for r in cat_results]
         correct = sum(1 for r in cat_results if r.correct)
+        significant = sum(1 for r in cat_results if r.significant)
+        noisy_numpy = sum(1 for r in cat_results if r.numpy_stats and r.numpy_stats.is_noisy)
+        noisy_numba = sum(1 for r in cat_results if r.numba_stats and r.numba_stats.is_noisy)
 
         print(f"\n{category.upper()}:")
         print(f"  Benchmarks: {len(cat_results)}")
         print(f"  Correct: {correct}/{len(cat_results)}")
+        print(f"  Significant results: {significant}/{len(cat_results)}")
         print(f"  Speedup - min: {min(speedups):.2f}x, max: {max(speedups):.2f}x, median: {sorted(speedups)[len(speedups)//2]:.2f}x")
+
+        # Noise warnings
+        if noisy_numpy > 0 or noisy_numba > 0:
+            print(f"  Noisy measurements: {noisy_numpy} NumPy, {noisy_numba} Numba (CV > 5%)")
 
         # Find best/worst
         fastest_numba = max(cat_results, key=lambda r: r.speedup)
         slowest_numba = min(cat_results, key=lambda r: r.speedup)
         print(f"  Best for Numba: {fastest_numba.name} ({fastest_numba.speedup:.2f}x)")
         print(f"  Best for NumPy: {slowest_numba.name} ({slowest_numba.speedup:.2f}x)")
+
+        # Show statistical details for extreme cases
+        if fastest_numba.numba_stats:
+            print(f"    -> Numba: {format_stats(fastest_numba.numba_stats)}")
+        if slowest_numba.numpy_stats:
+            print(f"    -> NumPy: {format_stats(slowest_numba.numpy_stats)}")
 
 
 def main():
@@ -346,8 +448,15 @@ def main():
     parser.add_argument('--output', type=str, default='results',
                        help='Output directory')
     parser.add_argument('--no-pin', action='store_true', help='Disable CPU pinning')
+    parser.add_argument('--show-system', action='store_true',
+                       help='Show detailed system state')
+    parser.add_argument('--disable-gc', action='store_true',
+                       help='Disable garbage collection during benchmarks')
 
     args = parser.parse_args()
+
+    # Capture system state first
+    system_state = capture_system_state()
 
     # Setup config
     config = BenchmarkConfig(
@@ -367,6 +476,14 @@ def main():
     print(f"Sizes: {config.sizes}")
     print(f"Dtypes: {config.dtypes}")
     print(f"Runs: {config.timed_runs} (warmup: {config.warmup_runs})")
+
+    # Show system state if requested or if there are warnings
+    if args.show_system:
+        print(format_system_state(system_state))
+    elif system_state.warnings:
+        print("\nReproducibility warnings:")
+        for w in system_state.warnings:
+            print(f"  - {w}")
 
     # Pin to CPU
     if not args.no_pin:
@@ -390,8 +507,12 @@ def main():
 
     print("\nStarting benchmarks...\n")
 
-    # Run
-    results = run_benchmarks(config, categories)
+    # Run with optional isolated environment
+    if args.disable_gc:
+        with isolated_benchmark_environment(disable_gc=True):
+            results = run_benchmarks(config, categories)
+    else:
+        results = run_benchmarks(config, categories)
 
     # Summary
     print_summary(results)
@@ -406,8 +527,15 @@ def main():
 
     md_path = os.path.join(config.output_dir, f'benchmark_{timestamp}.md')
     with open(md_path, 'w') as f:
-        f.write(results_to_markdown(results))
+        f.write(results_to_markdown(results, system_state))
     print(f"Markdown saved to: {md_path}")
+
+    # Save system state as JSON
+    import json
+    state_path = os.path.join(config.output_dir, f'system_state_{timestamp}.json')
+    with open(state_path, 'w') as f:
+        json.dump(state_to_dict(system_state), f, indent=2)
+    print(f"System state saved to: {state_path}")
 
 
 if __name__ == '__main__':
