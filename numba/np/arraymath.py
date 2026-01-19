@@ -551,13 +551,15 @@ def npy_min(a):
             raise ValueError("zero-size array to reduction operation "
                              "minimum which has no identity")
 
-        it = np.nditer(a)
-        min_value = next(it).take(0)
+        # Use a.flat for efficient iteration (matches cumsum/argmin pattern)
+        for v in a.flat:
+            min_value = v
+            break
+
         if pre_return_func(min_value):
             return min_value
 
-        for view in it:
-            v = view.item()
+        for v in a.flat:
             if pre_return_func(v):
                 return v
             if comparator(v, min_value):
@@ -601,13 +603,15 @@ def npy_max(a):
             raise ValueError("zero-size array to reduction operation "
                              "maximum which has no identity")
 
-        it = np.nditer(a)
-        max_value = next(it).take(0)
+        # Use a.flat for efficient iteration (matches cumsum/argmax pattern)
+        for v in a.flat:
+            max_value = v
+            break
+
         if pre_return_func(max_value):
             return max_value
 
-        for view in it:
-            v = view.item()
+        for v in a.flat:
             if pre_return_func(v):
                 return v
             if comparator(v, max_value):
