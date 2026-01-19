@@ -625,15 +625,16 @@ def npy_max(a):
 def array_argmin_impl_datetime(arry):
     if arry.size == 0:
         raise ValueError("attempt to get argmin of an empty sequence")
-    it = np.nditer(arry)
-    min_value = next(it).take(0)
-    min_idx = 0
+    # Use arry.flat for efficient iteration (matches float/generic patterns)
+    for v in arry.flat:
+        min_value = v
+        min_idx = 0
+        break
     if np.isnat(min_value):
         return min_idx
 
-    idx = 1
-    for view in it:
-        v = view.item()
+    idx = 0
+    for v in arry.flat:
         if np.isnat(v):
             return idx
         if v < min_value:
@@ -709,15 +710,16 @@ def array_argmin(a, axis=None):
 def array_argmax_impl_datetime(arry):
     if arry.size == 0:
         raise ValueError("attempt to get argmax of an empty sequence")
-    it = np.nditer(arry)
-    max_value = next(it).take(0)
-    max_idx = 0
+    # Use arry.flat for efficient iteration (matches float/generic patterns)
+    for v in arry.flat:
+        max_value = v
+        max_idx = 0
+        break
     if np.isnat(max_value):
         return max_idx
 
-    idx = 1
-    for view in it:
-        v = view.item()
+    idx = 0
+    for v in arry.flat:
         if np.isnat(v):
             return idx
         if v > max_value:
