@@ -836,13 +836,50 @@ def array_argmax(a, axis=None):
 @overload(np.all)
 @overload_method(types.Array, "all")
 def np_all(a):
-    def flat_all(a):
-        for v in np.nditer(a):
-            if not v.item():
-                return False
-        return True
+    # Optimized path for boolean arrays using hybrid approach
+    if a.dtype == types.bool_:
+        def flat_all_bool(a):
+            flat = a.ravel()
+            n = len(flat)
 
-    return flat_all
+            # Small arrays: simple loop (fast for early exit)
+            if n < 8192:
+                for i in range(n):
+                    if not flat[i]:
+                        return False
+                return True
+
+            # Check first 1024 elements for early exit (common case)
+            for i in range(1024):
+                if not flat[i]:
+                    return False
+
+            # Process rest with chunked prod (vectorized)
+            # For bool: prod==0 means at least one False
+            chunk = 4096
+            i = 1024
+            while i + chunk <= n:
+                if flat[i:i+chunk].prod() == 0:
+                    return False
+                i += chunk
+
+            # Remainder
+            while i < n:
+                if not flat[i]:
+                    return False
+                i += 1
+            return True
+
+        return flat_all_bool
+    else:
+        # Non-boolean: simple flat loop with early exit
+        def flat_all(a):
+            for v in a.flat:
+                if not v:
+                    return False
+            return True
+
+        return flat_all
 
 
 @register_jitable
@@ -942,13 +979,50 @@ def np_allclose(a, b, rtol=1e-05, atol=1e-08, equal_nan=False):
 @overload(np.any)
 @overload_method(types.Array, "any")
 def np_any(a):
-    def flat_any(a):
-        for v in np.nditer(a):
-            if v.item():
-                return True
-        return False
+    # Optimized path for boolean arrays using hybrid approach
+    if a.dtype == types.bool_:
+        def flat_any_bool(a):
+            flat = a.ravel()
+            n = len(flat)
 
-    return flat_any
+            # Small arrays: simple loop (fast for early exit)
+            if n < 8192:
+                for i in range(n):
+                    if flat[i]:
+                        return True
+                return False
+
+            # Check first 1024 elements for early exit (common case)
+            for i in range(1024):
+                if flat[i]:
+                    return True
+
+            # Process rest with chunked sum (vectorized)
+            # For bool: sum>0 means at least one True
+            chunk = 4096
+            i = 1024
+            while i + chunk <= n:
+                if flat[i:i+chunk].sum() > 0:
+                    return True
+                i += chunk
+
+            # Remainder
+            while i < n:
+                if flat[i]:
+                    return True
+                i += 1
+            return False
+
+        return flat_any_bool
+    else:
+        # Non-boolean: simple flat loop with early exit
+        def flat_any(a):
+            for v in a.flat:
+                if v:
+                    return True
+            return False
+
+        return flat_any
 
 
 @overload(np.average)
