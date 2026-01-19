@@ -3664,6 +3664,40 @@ def np_diff_impl(a, n=1):
     if not isinstance(a, types.Array) or a.ndim == 0:
         return
 
+    # Fast path for 1D arrays (most common case)
+    if a.ndim == 1:
+        def diff_impl_1d(a, n=1):
+            if n == 0:
+                return a.copy()
+            if n < 0:
+                raise ValueError("diff(): order must be non-negative")
+
+            size = len(a)
+            if n >= size:
+                return np.empty(0, a.dtype)
+
+            # Common case: n=1, simple subtraction loop
+            if n == 1:
+                out = np.empty(size - 1, a.dtype)
+                for i in range(size - 1):
+                    out[i] = a[i + 1] - a[i]
+                return out
+
+            # General case: apply diff n times
+            result = a.copy()
+            for _ in range(n):
+                new_size = len(result) - 1
+                if new_size <= 0:
+                    return np.empty(0, a.dtype)
+                temp = np.empty(new_size, a.dtype)
+                for i in range(new_size):
+                    temp[i] = result[i + 1] - result[i]
+                result = temp
+            return result
+
+        return diff_impl_1d
+
+    # Multi-dimensional arrays: use original implementation
     def diff_impl(a, n=1):
         if n == 0:
             return a.copy()
