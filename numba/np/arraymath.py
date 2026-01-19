@@ -449,18 +449,47 @@ def array_mean(a):
 @overload_method(types.Array, "var")
 def array_var(a):
     if isinstance(a, types.Array):
-        def array_var_impl(a):
-            # Compute the mean
-            m = a.mean()
+        # Fast path for real (non-complex) types
+        if not isinstance(a.dtype, types.Complex):
+            def array_var_impl_real(a):
+                n = a.size
+                if n == 0:
+                    return np.nan
 
-            # Compute the sum of square diffs
-            ssd = 0
-            for v in np.nditer(a):
-                val = (v.item() - m)
-                ssd += np.real(val * np.conj(val))
-            return ssd / a.size
+                # Pass 1: compute mean using .flat (fast iteration)
+                total = 0.0
+                for v in a.flat:
+                    total += v
+                mean = total / n
 
-        return array_var_impl
+                # Pass 2: compute sum of squared differences
+                ssd = 0.0
+                for v in a.flat:
+                    diff = v - mean
+                    ssd += diff * diff
+
+                return ssd / n
+
+            return array_var_impl_real
+        else:
+            # Complex types need conjugate handling
+            def array_var_impl_complex(a):
+                n = a.size
+                if n == 0:
+                    return np.nan
+
+                # Compute the mean
+                m = a.mean()
+
+                # Compute the sum of square diffs using .flat
+                ssd = 0.0
+                for v in a.flat:
+                    val = v - m
+                    ssd += np.real(val * np.conj(val))
+
+                return ssd / n
+
+            return array_var_impl_complex
 
 
 @overload(np.std)
