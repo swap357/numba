@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Numba Pipeline Viewer</title>
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <script src="https://unpkg.com/dagre-d3@0.6.4/dist/dagre-d3.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "SF Mono", "Fira Code", monospace;
+      background: #0d1117;
+      color: #c9d1d9;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .container { display: flex; height: 100vh; }
+    .pane {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #30363d;
+    }
+    .pane-code { width: 35%; min-width: 300px; }
+    .pane-output { flex: 1; }
+    .pane-header {
+      padding: 12px 16px;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .pane-header h2 { font-size: 13px; font-weight: 500; color: #8b949e; }
+    .pane-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+    textarea {
+      flex: 1;
+      width: 100%;
+      background: #0d1117;
+      color: #c9d1d9;
+      border: none;
+      padding: 16px;
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 1.6;
+      resize: none;
+      tab-size: 4;
+    }
+    textarea:focus { outline: none; }
+
+    button {
+      background: #238636;
+      color: white;
+      border: none;
+      padding: 6px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    button:hover { background: #2ea043; }
+    button:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+
+    .tabs {
+      display: flex;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      gap: 4px;
+      padding: 0 12px;
+    }
+    .tab {
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: 12px;
+      border-bottom: 2px solid transparent;
+      color: #8b949e;
+      transition: all 0.15s;
+    }
+    .tab:hover { color: #c9d1d9; }
+    .tab.active { color: #58a6ff; border-bottom-color: #f78166; }
+
+    /* Unified toolbar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      padding: 6px 12px;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      gap: 16px;
+    }
+    .toolbar-left { display: flex; gap: 4px; }
+    .toolbar-center {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .toolbar-right { display: flex; gap: 8px; }
+    .view-btn {
+      padding: 4px 12px;
+      font-size: 11px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      color: #8b949e;
+      cursor: pointer;
+    }
+    .view-btn.active { background: #388bfd; border-color: #388bfd; color: white; }
+
+    /* Timeline for passes */
+    .timeline {
+      display: flex;
+      gap: 3px;
+      padding: 4px 12px;
+      background: #0d1117;
+      border-bottom: 1px solid #21262d;
+      justify-content: center;
+    }
+    .timeline-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #30363d;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .timeline-dot:hover { background: #484f58; }
+    .timeline-dot.active { background: #58a6ff; }
+    .timeline-dot.visited { background: #3fb950; }
+
+    /* Toolbar nav buttons */
+    .toolbar-nav-btn {
+      padding: 4px 10px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      color: #c9d1d9;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .toolbar-nav-btn:hover:not(:disabled) { background: #30363d; }
+    .toolbar-nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Function selector */
+    .func-selector {
+      padding: 4px 8px;
+      font-size: 11px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      color: #c9d1d9;
+      cursor: pointer;
+      max-width: 200px;
+    }
+    .func-selector:focus { outline: 1px solid #58a6ff; }
+    .pass-info {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 280px;
+      gap: 8px;
+    }
+    .pass-name {
+      font-size: 12px;
+      color: #58a6ff;
+      font-weight: 500;
+      flex: 1;
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .pass-counter {
+      font-size: 11px;
+      color: #8b949e;
+      flex-shrink: 0;
+    }
+
+    .output-area {
+      flex: 1;
+      overflow: auto;
+      background: #0d1117;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    #output-content {
+      flex: 1;
+      min-height: 0; /* Allow natural sizing */
+    }
+    .raw-output {
+      padding: 16px;
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* CFG Graph Styles */
+    .graph-container { width: 100%; height: 100%; }
+    .graph-container svg { width: 100%; height: 100%; }
+    .node rect {
+      fill: #161b22;
+      stroke: #30363d;
+      stroke-width: 1px;
+      rx: 4;
+    }
+    .node.entry rect { stroke: #3fb950; stroke-width: 2px; }
+    .node.exit rect { stroke: #f85149; stroke-width: 2px; }
+    .node text { fill: #c9d1d9; font-size: 11px; font-family: inherit; }
+    .edgePath path { stroke: #8b949e; fill: none; stroke-width: 1.5px; }
+    .edgePath marker { fill: #8b949e; }
+    .edgeLabel { font-size: 10px; fill: #8b949e; }
+
+    /* Bytecode flow */
+    .bytecode-flow {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .bc-instr {
+      display: flex;
+      align-items: center;
+      padding: 6px 12px;
+      background: #161b22;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .bc-offset { color: #8b949e; width: 40px; }
+    .bc-opcode { color: #79c0ff; width: 140px; font-weight: 500; }
+    .bc-arg { color: #a5d6ff; flex: 1; }
+    .bc-lineno { color: #484f58; font-size: 10px; }
+
+    /* Type table */
+    .type-panel {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .type-section {
+      padding: 12px 16px;
+      border-bottom: 1px solid #30363d;
+    }
+    .type-section h3 {
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .type-table {
+      width: 100%;
+      font-size: 12px;
+      border-collapse: collapse;
+    }
+    .type-table td {
+      padding: 4px 8px;
+      border-bottom: 1px solid #21262d;
+    }
+    .type-table .var-name { color: #d2a8ff; }
+    .type-table .var-type { color: #7ee787; }
+    .type-return {
+      display: inline-block;
+      padding: 4px 12px;
+      background: #388bfd22;
+      border: 1px solid #388bfd;
+      border-radius: 4px;
+      color: #79c0ff;
+    }
+
+    /* Split view for SSA */
+    .split-view {
+      display: flex;
+      height: 100%;
+      min-height: 500px;
+    }
+    .split-left { flex: 1; border-right: 1px solid #30363d; overflow: auto; min-height: 500px; }
+    .split-right { width: 320px; overflow: auto; }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #8b949e;
+    }
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid #30363d;
+      border-top-color: #58a6ff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-banner {
+      background: #f8514922;
+      border: 1px solid #f85149;
+      color: #f85149;
+      padding: 8px 16px;
+      margin: 16px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .error-panel {
+      margin: 16px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #f85149;
+    }
+
+    .error-header {
+      background: #f85149;
+      color: white;
+      padding: 10px 16px;
+      font-weight: 600;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .error-header::before {
+      content: "✕";
+      font-size: 14px;
+    }
+
+    .error-body {
+      background: #1a1a1a;
+      padding: 16px;
+      overflow-x: auto;
+    }
+
+    .error-traceback {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #e6e6e6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .error-traceback .tb-file {
+      color: #79c0ff;
+    }
+
+    .error-traceback .tb-line {
+      color: #ffa657;
+    }
+
+    .error-traceback .tb-error-type {
+      color: #ff7b72;
+      font-weight: 600;
+    }
+
+    .error-traceback .tb-error-msg {
+      color: #f85149;
+    }
+
+    .error-traceback .tb-code {
+      color: #8b949e;
+      padding-left: 16px;
+    }
+
+    .error-summary {
+      background: #21262d;
+      border-top: 1px solid #30363d;
+      padding: 12px 16px;
+      font-size: 12px;
+    }
+
+    .error-summary-label {
+      color: #8b949e;
+      margin-right: 8px;
+    }
+
+    .error-summary-value {
+      color: #f85149;
+      font-weight: 500;
+    }
+
+    /* Block detail modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      max-width: 700px;
+      max-height: 80vh;
+      width: 90%;
+      display: flex;
+      flex-direction: column;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid #30363d;
+    }
+    .modal-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: #58a6ff;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: #8b949e;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+    .modal-close:hover { color: #c9d1d9; }
+    .modal-body {
+      padding: 16px;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .modal-instr {
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-bottom: 2px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .modal-instr:hover { background: #21262d; }
+    .node { cursor: pointer; }
+    .node:hover rect { stroke-width: 2px; }
+
+    /* Removed blocks (diff tracking) */
+    .node.removed rect {
+      fill: #21262d;
+      stroke: #484f58;
+      stroke-dasharray: 4 2;
+      opacity: 0.5;
+    }
+    .node.removed text { opacity: 0.5; }
+
+    /* New blocks */
+    .node.new rect {
+      stroke: #a371f7;
+      stroke-width: 2px;
+    }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      gap: 16px;
+      padding: 4px 12px;
+      background: #0d1117;
+      border-bottom: 1px solid #21262d;
+      font-size: 10px;
+      color: #8b949e;
+      justify-content: center;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      border: 2px solid;
+    }
+    .legend-dot.entry { border-color: #3fb950; background: #161b22; }
+    .legend-dot.exit { border-color: #f85149; background: #161b22; }
+    .legend-dot.removed { border-color: #484f58; border-style: dashed; background: #21262d; opacity: 0.6; }
+    .legend-dot.new { border-color: #a371f7; background: #161b22; }
+
+    /* Summary View - Monospace table */
+    .summary-mono {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #c9d1d9;
+      background: #0d1117;
+      padding: 16px;
+      margin: 0;
+      white-space: pre;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title">Block 0</span>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+  <div class="container">
+    <div class="pane pane-code">
+      <div class="pane-header">
+        <h2>Python Source</h2>
+        <button id="compile-btn">Compile</button>
+      </div>
+      <div class="pane-content">
+        <textarea id="code" spellcheck="false">from numba import njit
+
+@njit
+def f():
+    x = None
+    for _ in range(0):
+        x = 'v'
+    return x == None
+
+# Trigger compilation
+result = f()
+print(f"Result: {result}")</textarea>
+      </div>
+    </div>
+
+    <div class="pane pane-output">
+      <div class="tabs" id="tabs">
+        <div class="tab active" data-stage="bytecode">Bytecode</div>
+        <div class="tab" data-stage="ir">Numba IR</div>
+        <div class="tab" data-stage="passes">IR Passes</div>
+        <div class="tab" data-stage="ssa">SSA + Types</div>
+        <div class="tab" data-stage="llvm">LLVM IR</div>
+        <div class="tab" data-stage="assembly">Assembly</div>
+      </div>
+      <div class="toolbar" id="toolbar">
+        <div class="toolbar-left" id="toolbar-left">
+          <button class="view-btn active" data-view="graph">Graph</button>
+          <button class="view-btn" data-view="summary">Summary</button>
+          <button class="view-btn" data-view="raw">Raw</button>
+        </div>
+        <div class="toolbar-center" id="toolbar-center">
+          <!-- Context-specific controls rendered here -->
+        </div>
+        <div class="toolbar-right" id="toolbar-right"></div>
+      </div>
+      <div class="timeline" id="timeline" style="display:none;">
+        <!-- Pass dots rendered here for IR Passes only -->
+      </div>
+      <div class="legend" id="legend" style="display:none;">
+        <div class="legend-item"><div class="legend-dot entry"></div> Entry</div>
+        <div class="legend-item"><div class="legend-dot exit"></div> Exit</div>
+        <div class="legend-item" id="legend-removed" style="display:none;"><div class="legend-dot removed"></div> Removed</div>
+        <div class="legend-item" id="legend-new" style="display:none;"><div class="legend-dot new"></div> New</div>
+      </div>
+      <div class="pane-content">
+        <div class="output-area" id="output">
+          <div class="loading" id="loading" style="display: none;">
+            <div class="spinner"></div>
+            <span>Compiling...</span>
+          </div>
+          <div id="output-content" class="raw-output">Press Compile or Ctrl+Enter</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const codeEl = document.getElementById('code');
+    const compileBtn = document.getElementById('compile-btn');
+    const tabs = document.getElementById('tabs');
+    const toolbarLeft = document.getElementById('toolbar-left');
+    const toolbarCenter = document.getElementById('toolbar-center');
+    const timeline = document.getElementById('timeline');
+    const outputEl = document.getElementById('output-content');
+    const outputArea = document.getElementById('output');
+    const loading = document.getElementById('loading');
+    const modalOverlay = document.getElementById('modal-overlay');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalClose = document.getElementById('modal-close');
+
+    let results = {};
+    let activeStage = 'bytecode';
+    let viewMode = 'graph';
+    let currentPassIndex = 0;
+    let currentBlocks = []; // Store current graph's blocks for modal
+    let selectedFunction = null; // Currently selected function for passes view
+    const legend = document.getElementById('legend');
+    const legendRemoved = document.getElementById('legend-removed');
+    const legendNew = document.getElementById('legend-new');
+    const toolbarRight = document.getElementById('toolbar-right');
+
+    // Get filtered passes for selected function
+    function getFilteredPasses() {
+      const allPasses = results.passes?.parsed;
+      if (!allPasses) return [];
+      if (!selectedFunction) return allPasses;
+      return allPasses.filter(p => p.function === selectedFunction);
+    }
+
+    // Get blocks from a specific pass index (within filtered passes)
+    function getPassBlocks(index) {
+      const passes = getFilteredPasses();
+      if (!passes || index < 0 || index >= passes.length) return null;
+      return passes[index]?.ir?.blocks || null;
+    }
+
+    // Compare blocks between passes, returns {removed: [], new: []}
+    function diffBlocks(prevBlocks, currBlocks) {
+      if (!prevBlocks || !currBlocks) return { removed: [], new: [] };
+      const prevLabels = new Set(prevBlocks.map(b => String(b.label)));
+      const currLabels = new Set(currBlocks.map(b => String(b.label)));
+      return {
+        removed: prevBlocks.filter(b => !currLabels.has(String(b.label))),
+        new: currBlocks.filter(b => !prevLabels.has(String(b.label))),
+      };
+    }
+
+    // Modal functions
+    function showBlockModal(blockLabel) {
+      const block = currentBlocks.find(b => String(b.label) === String(blockLabel));
+      if (!block) return;
+
+      modalTitle.textContent = `Block ${block.label}`;
+      modalBody.innerHTML = block.instructions.map(instr =>
+        `<div class="modal-instr">${escapeHtml(instr)}</div>`
+      ).join('');
+      modalOverlay.classList.add('visible');
+    }
+
+    function hideModal() {
+      modalOverlay.classList.remove('visible');
+    }
+
+    modalClose.addEventListener('click', hideModal);
+    modalOverlay.addEventListener('click', e => {
+      if (e.target === modalOverlay) hideModal();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') hideModal();
+    });
+
+    // Tab switching
+    tabs.addEventListener('click', e => {
+      const tab = e.target.closest('.tab');
+      if (tab) {
+        activeStage = tab.dataset.stage;
+        tabs.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === tab));
+        render();
+      }
+    });
+
+    // View toggle
+    toolbarLeft.addEventListener('click', e => {
+      const btn = e.target.closest('.view-btn');
+      if (btn) {
+        viewMode = btn.dataset.view;
+        toolbarLeft.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b === btn));
+        render();
+      }
+    });
+
+    function updateToolbar() {
+      const data = results[activeStage];
+
+      if (activeStage === 'passes' && data?.parsed?.length) {
+        // Set default selected function if not set
+        const functions = data.functions || [];
+        if (!selectedFunction && functions.length) {
+          selectedFunction = functions[0];
+        }
+
+        // Get filtered passes for selected function
+        const passes = getFilteredPasses();
+        if (currentPassIndex >= passes.length) currentPassIndex = Math.max(0, passes.length - 1);
+
+        // Show function selector
+        if (functions.length > 1) {
+          toolbarRight.innerHTML = `
+            <select class="func-selector" id="func-selector">
+              ${functions.map(f => `<option value="${escapeHtml(f)}" ${f === selectedFunction ? 'selected' : ''}>${escapeHtml(f)}</option>`).join('')}
+            </select>
+          `;
+          document.getElementById('func-selector').addEventListener('change', e => {
+            selectedFunction = e.target.value;
+            currentPassIndex = 0;
+            updateToolbar();
+            render();
+          });
+        } else {
+          toolbarRight.innerHTML = '';
+        }
+
+        if (passes.length) {
+          // Show pass navigation in toolbar
+          const pass = passes[currentPassIndex];
+          toolbarCenter.innerHTML = `
+            <button class="toolbar-nav-btn" id="prev-pass" ${currentPassIndex === 0 ? 'disabled' : ''}>← Prev</button>
+            <div class="pass-info">
+              <span class="pass-name" title="${escapeHtml(pass.pass_name)}">${escapeHtml(pass.pass_name)}</span>
+              <span class="pass-counter">${currentPassIndex + 1} / ${passes.length}</span>
+            </div>
+            <button class="toolbar-nav-btn" id="next-pass" ${currentPassIndex === passes.length - 1 ? 'disabled' : ''}>Next →</button>
+          `;
+
+          // Show timeline
+          timeline.innerHTML = passes.map((p, i) => `
+            <div class="timeline-dot ${i === currentPassIndex ? 'active' : ''} ${i < currentPassIndex ? 'visited' : ''}"
+                 data-index="${i}" title="${escapeHtml(p.pass_name)}"></div>
+          `).join('');
+          timeline.style.display = 'flex';
+
+          // Add event listeners
+          document.getElementById('prev-pass').addEventListener('click', () => {
+            if (currentPassIndex > 0) {
+              currentPassIndex--;
+              updateToolbar();
+              renderPassGraph();
+            }
+          });
+          document.getElementById('next-pass').addEventListener('click', () => {
+            if (currentPassIndex < passes.length - 1) {
+              currentPassIndex++;
+              updateToolbar();
+              renderPassGraph();
+            }
+          });
+          timeline.addEventListener('click', e => {
+            const dot = e.target.closest('.timeline-dot');
+            if (dot) {
+              currentPassIndex = parseInt(dot.dataset.index);
+              updateToolbar();
+              renderPassGraph();
+            }
+          });
+        } else {
+          toolbarCenter.innerHTML = '<span style="color:#8b949e">No passes for this function</span>';
+          timeline.style.display = 'none';
+        }
+      } else {
+        // Hide pass controls for other stages
+        toolbarCenter.innerHTML = '';
+        toolbarRight.innerHTML = '';
+        timeline.style.display = 'none';
+      }
+    }
+
+    function render() {
+      const data = results[activeStage];
+
+      // Update toolbar based on active stage
+      updateToolbar();
+
+      // Show legend for graph views (not raw, not bytecode)
+      const showLegend = viewMode === 'graph' && activeStage !== 'bytecode' && data;
+      legend.style.display = showLegend ? 'flex' : 'none';
+      legendRemoved.style.display = 'none';
+      legendNew.style.display = 'none';
+
+      if (!data) {
+        outputEl.innerHTML = '<div class="raw-output">Not yet compiled.</div>';
+        return;
+      }
+
+      if (viewMode === 'raw') {
+        legend.style.display = 'none';
+        outputEl.innerHTML = `<div class="raw-output">${escapeHtml(data.raw)}</div>`;
+        return;
+      }
+
+      // Summary view for LLVM and Assembly
+      if (viewMode === 'summary') {
+        if (activeStage === 'llvm' && data.analysis) {
+          renderLLVMSummary(data.analysis, data.raw);
+        } else if (activeStage === 'assembly' && data.analysis) {
+          renderAssemblySummary(data.analysis, data.raw);
+        } else {
+          outputEl.innerHTML = '<div class="raw-output">Summary view not available for this stage</div>';
+        }
+        return;
+      }
+
+      // Graph/structured view
+      if (activeStage === 'bytecode') {
+        renderBytecode(data.parsed);
+      } else if (activeStage === 'ir') {
+        renderCFG(data.parsed, 'ir');
+      } else if (activeStage === 'passes') {
+        renderPasses(data.parsed);
+      } else if (activeStage === 'ssa') {
+        renderSSA(data.parsed);
+      } else if (activeStage === 'llvm') {
+        renderCFG(data.parsed, 'llvm');
+      } else {
+        outputEl.innerHTML = `<div class="raw-output">${escapeHtml(data.raw)}</div>`;
+      }
+
+      // Show error panel if compilation failed
+      if (data.returncode !== 0) {
+        const errorHtml = renderErrorPanel(data.raw, data.returncode);
+        outputEl.insertAdjacentHTML('afterbegin', errorHtml);
+      }
+    }
+
+    function renderErrorPanel(raw, returncode) {
+      // Parse traceback to extract error info
+      const lines = raw.split('\n');
+      let errorType = 'Error';
+      let errorMsg = '';
+      let traceback = [];
+      let inTraceback = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        if (line.startsWith('Traceback')) {
+          inTraceback = true;
+          traceback.push(line);
+          continue;
+        }
+
+        if (inTraceback) {
+          traceback.push(line);
+
+          // Check for error line (e.g., "TypeError: ...")
+          const errorMatch = line.match(/^(\w+Error|\w+Exception|KeyError|ValueError|TypeError|RuntimeError|NameError|AttributeError|ImportError|SyntaxError|IndentationError):\s*(.*)$/);
+          if (errorMatch) {
+            errorType = errorMatch[1];
+            errorMsg = errorMatch[2];
+          }
+        }
+      }
+
+      // If no traceback found, show raw output
+      if (traceback.length === 0) {
+        return `
+          <div class="error-panel">
+            <div class="error-header">Compilation Failed (exit code ${returncode})</div>
+            <div class="error-body">
+              <pre class="error-traceback">${escapeHtml(raw)}</pre>
+            </div>
+          </div>
+        `;
+      }
+
+      // Format traceback with syntax highlighting
+      const formattedTb = traceback.map(line => {
+        // File lines: '  File "path", line N, in func'
+        const fileMatch = line.match(/^(\s*File\s+)"([^"]+)",\s+line\s+(\d+)(.*)/);
+        if (fileMatch) {
+          return `${fileMatch[1]}<span class="tb-file">"${escapeHtml(fileMatch[2])}"</span>, line <span class="tb-line">${fileMatch[3]}</span>${escapeHtml(fileMatch[4])}`;
+        }
+
+        // Error line
+        const errMatch = line.match(/^(\w+Error|\w+Exception|KeyError|ValueError|TypeError|RuntimeError|NameError|AttributeError|ImportError|SyntaxError|IndentationError):\s*(.*)$/);
+        if (errMatch) {
+          return `<span class="tb-error-type">${escapeHtml(errMatch[1])}</span>: <span class="tb-error-msg">${escapeHtml(errMatch[2])}</span>`;
+        }
+
+        // Code lines (indented)
+        if (line.match(/^\s{4,}\S/)) {
+          return `<span class="tb-code">${escapeHtml(line)}</span>`;
+        }
+
+        return escapeHtml(line);
+      }).join('\n');
+
+      return `
+        <div class="error-panel">
+          <div class="error-header">${escapeHtml(errorType)}: ${escapeHtml(errorMsg || 'Compilation failed')}</div>
+          <div class="error-body">
+            <pre class="error-traceback">${formattedTb}</pre>
+          </div>
+          <div class="error-summary">
+            <span class="error-summary-label">Exit code:</span>
+            <span class="error-summary-value">${returncode}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderBytecode(instructions) {
+      if (!instructions || !instructions.length) {
+        outputEl.innerHTML = '<div class="raw-output">No bytecode found</div>';
+        return;
+      }
+      const html = instructions.map(i => `
+        <div class="bc-instr">
+          <span class="bc-offset">${i.offset}</span>
+          <span class="bc-opcode">${i.opcode}</span>
+          <span class="bc-arg">${i.arg}</span>
+          <span class="bc-lineno">L${i.lineno}</span>
+        </div>
+      `).join('');
+      outputEl.innerHTML = `<div class="bytecode-flow">${html}</div>`;
+    }
+
+    function renderPasses(allPasses) {
+      const passes = getFilteredPasses();
+      if (!passes || !passes.length) {
+        outputEl.innerHTML = '<div class="raw-output">No passes found for this function</div>';
+        return;
+      }
+
+      // Clamp current index
+      if (currentPassIndex >= passes.length) currentPassIndex = passes.length - 1;
+      if (currentPassIndex < 0) currentPassIndex = 0;
+
+      // Just render the graph container - navigation is in toolbar
+      outputEl.innerHTML = '<div class="graph-container"><svg></svg></div>';
+
+      // Render CFG for current pass
+      const pass = passes[currentPassIndex];
+      renderPassCFG(pass.ir, document.querySelector('#output-content .graph-container'));
+    }
+
+    function renderPassGraph() {
+      // Re-render just the pass graph without rebuilding entire content
+      const passes = getFilteredPasses();
+      if (!passes || !passes.length) return;
+
+      const pass = passes[currentPassIndex];
+      const container = document.querySelector('#output-content .graph-container');
+      if (container) {
+        container.innerHTML = '<svg></svg>';
+        renderPassCFG(pass.ir, container);
+      }
+    }
+
+    function renderPassCFG(parsed, container) {
+      if (!parsed || !parsed.blocks || !parsed.blocks.length) {
+        container.innerHTML = '<div class="raw-output">No blocks</div>';
+        return;
+      }
+
+      // Get diff with previous pass
+      const prevBlocks = getPassBlocks(currentPassIndex - 1);
+      const diff = diffBlocks(prevBlocks, parsed.blocks);
+
+      // Store all blocks (current + removed) for modal
+      currentBlocks = [...parsed.blocks, ...diff.removed];
+
+      // Update legend visibility
+      legendRemoved.style.display = diff.removed.length ? 'flex' : 'none';
+      legendNew.style.display = diff.new.length ? 'flex' : 'none';
+
+      const newLabels = new Set(diff.new.map(b => String(b.label)));
+
+      requestAnimationFrame(() => {
+        const svg = d3.select(container).select('svg');
+        const width = container.clientWidth || 600;
+        const height = container.clientHeight || 400;
+        svg.attr('width', width).attr('height', height);
+
+        const g = new dagreD3.graphlib.Graph().setGraph({
+          rankdir: 'TB', ranksep: 40, nodesep: 30, marginx: 20, marginy: 20,
+        });
+
+        // Add current blocks
+        parsed.blocks.forEach((block, i) => {
+          const instrLines = block.instructions.slice(0, 5).map(instr => {
+            const clean = instr.replace(/\s*\[.*?\]\s*$/, '').trim();
+            return clean.length > 45 ? clean.substring(0, 42) + '...' : clean;
+          });
+          const label = instrLines.join('\n') +
+            (block.instructions.length > 5 ? `\n... +${block.instructions.length - 5}` : '');
+
+          let nodeClass = i === 0 ? 'entry' : (block.successors.length === 0 ? 'exit' : '');
+          if (newLabels.has(String(block.label))) nodeClass += ' new';
+
+          g.setNode(String(block.label), {
+            label: `Block ${block.label}\n─────────────\n${label}`,
+            class: nodeClass,
+            labelStyle: 'font-size: 10px; font-family: monospace;',
+            rx: 6, ry: 6, padding: 10,
+          });
+        });
+
+        // Add removed blocks (faded)
+        diff.removed.forEach(block => {
+          const instrLines = block.instructions.slice(0, 3).map(instr => {
+            const clean = instr.replace(/\s*\[.*?\]\s*$/, '').trim();
+            return clean.length > 40 ? clean.substring(0, 37) + '...' : clean;
+          });
+          const label = instrLines.join('\n') + (block.instructions.length > 3 ? '\n...' : '');
+
+          g.setNode(String(block.label), {
+            label: `Block ${block.label} [removed]\n─────────────\n${label}`,
+            class: 'removed',
+            labelStyle: 'font-size: 10px; font-family: monospace;',
+            rx: 6, ry: 6, padding: 10,
+          });
+        });
+
+        // Add edges for current blocks
+        parsed.blocks.forEach(block => {
+          block.successors.forEach((succ, i) => {
+            // Only add edge if target exists
+            if (g.hasNode(String(succ))) {
+              g.setEdge(String(block.label), String(succ), {
+                label: block.successors.length > 1 ? (i === 0 ? 'T' : 'F') : '',
+                curve: d3.curveBasis,
+              });
+            }
+          });
+        });
+
+        const render = new dagreD3.render();
+        const svgGroup = svg.append('g');
+        render(svgGroup, g);
+
+        // Add click handlers to nodes
+        svgGroup.selectAll('.node').each(function(nodeLabel) {
+          d3.select(this).style('cursor', 'pointer').on('click', function() {
+            showBlockModal(nodeLabel);
+          });
+        });
+
+        const zoom = d3.zoom()
+          .scaleExtent([0.1, 3])
+          .on('zoom', () => svgGroup.attr('transform', d3.event.transform));
+        svg.call(zoom);
+
+        const graphWidth = g.graph().width || 200;
+        const graphHeight = g.graph().height || 200;
+        const scale = Math.min((width - 40) / graphWidth, (height - 40) / graphHeight, 1);
+        svg.call(zoom.transform, d3.zoomIdentity.translate(20, 20).scale(scale));
+      });
+    }
+
+    function renderCFG(parsed, type) {
+      console.log('renderCFG called:', type, parsed);
+
+      if (!parsed || !parsed.blocks || !parsed.blocks.length) {
+        outputEl.innerHTML = '<div class="raw-output">No blocks found. Parsed data: ' + JSON.stringify(parsed) + '</div>';
+        return;
+      }
+
+      currentBlocks = parsed.blocks; // Store for modal
+      outputEl.innerHTML = '<div class="graph-container"><svg></svg></div>';
+
+      // Wait for DOM to update
+      requestAnimationFrame(() => {
+        const container = document.querySelector('.graph-container');
+        if (!container) {
+          console.error('No graph container found');
+          return;
+        }
+        const svg = d3.select('.graph-container svg');
+        console.log('Container size:', container.clientWidth, 'x', container.clientHeight);
+
+        // Set explicit dimensions
+        const width = container.clientWidth || 800;
+        const height = container.clientHeight || 600;
+        svg.attr('width', width).attr('height', height);
+
+        const g = new dagreD3.graphlib.Graph().setGraph({
+          rankdir: 'TB',
+          ranksep: 50,
+          nodesep: 40,
+          marginx: 30,
+          marginy: 30,
+        });
+
+        // Add nodes
+        parsed.blocks.forEach((block, i) => {
+          const instrLines = block.instructions.slice(0, 6).map(instr => {
+            // Truncate long lines
+            const clean = instr.replace(/\s*\[.*?\]\s*$/, '').trim();
+            return clean.length > 50 ? clean.substring(0, 47) + '...' : clean;
+          });
+          const label = instrLines.join('\n') +
+            (block.instructions.length > 6 ? `\n... +${block.instructions.length - 6}` : '');
+
+          const isEntry = i === 0;
+          const isExit = block.successors.length === 0;
+
+          g.setNode(String(block.label), {
+            label: `Block ${block.label}\n─────────────\n${label}`,
+            class: isEntry ? 'entry' : (isExit ? 'exit' : ''),
+            labelStyle: 'font-size: 11px; font-family: monospace;',
+            rx: 6,
+            ry: 6,
+            padding: 12,
+          });
+        });
+
+        // Add edges
+        parsed.blocks.forEach(block => {
+          block.successors.forEach((succ, i) => {
+            const edgeLabel = block.successors.length > 1 ? (i === 0 ? 'true' : 'false') : '';
+            g.setEdge(String(block.label), String(succ), {
+              label: edgeLabel,
+              labelStyle: 'font-size: 10px; fill: #8b949e;',
+              curve: d3.curveBasis,
+            });
+          });
+        });
+
+        // Render
+        console.log('Creating graph with', g.nodeCount(), 'nodes');
+        const render = new dagreD3.render();
+        const svgGroup = svg.append('g');
+
+        try {
+          render(svgGroup, g);
+          console.log('Graph rendered, size:', g.graph().width, 'x', g.graph().height);
+        } catch (e) {
+          console.error('Render error:', e);
+          outputEl.innerHTML = '<div class="raw-output error">Render error: ' + e.message + '</div>';
+          return;
+        }
+
+        // Add click handlers to nodes
+        svgGroup.selectAll('.node').each(function(nodeLabel) {
+          d3.select(this).style('cursor', 'pointer').on('click', function() {
+            showBlockModal(nodeLabel);
+          });
+        });
+
+        // Zoom/pan
+        const zoom = d3.zoom()
+          .scaleExtent([0.1, 3])
+          .on('zoom', () => svgGroup.attr('transform', d3.event.transform));
+        svg.call(zoom);
+
+        // Fit graph to container
+        const graphWidth = g.graph().width || 200;
+        const graphHeight = g.graph().height || 200;
+        const scale = Math.min(
+          (width - 40) / graphWidth,
+          (height - 40) / graphHeight,
+          1.2
+        );
+        const translateX = (width - graphWidth * scale) / 2;
+        const translateY = 20;
+        svg.call(zoom.transform, d3.zoomIdentity.translate(translateX, translateY).scale(scale));
+        console.log('Graph positioned at scale', scale);
+      });
+    }
+
+    function renderSSA(parsed) {
+      if (!parsed) {
+        outputEl.innerHTML = '<div class="raw-output">No data</div>';
+        return;
+      }
+
+      const { ir, types } = parsed;
+
+      // Split view: CFG on left, types on right
+      outputEl.innerHTML = `
+        <div class="split-view">
+          <div class="split-left">
+            <div class="graph-container"><svg></svg></div>
+          </div>
+          <div class="split-right">
+            <div class="type-panel">
+              <div class="type-section">
+                <h3>Return Type</h3>
+                <span class="type-return">${escapeHtml(types.return_type || 'unknown')}</span>
+              </div>
+              <div class="type-section">
+                <h3>Variable Types</h3>
+                <table class="type-table">
+                  ${Object.entries(types.variables || {}).map(([name, type]) => `
+                    <tr>
+                      <td class="var-name">${escapeHtml(name)}</td>
+                      <td class="var-type">${escapeHtml(type)}</td>
+                    </tr>
+                  `).join('')}
+                </table>
+              </div>
+              ${types.call_types && types.call_types.length ? `
+                <div class="type-section">
+                  <h3>Call Types</h3>
+                  <table class="type-table">
+                    ${types.call_types.map(c => `
+                      <tr>
+                        <td class="var-name" style="font-size:10px">${escapeHtml(c.call.substring(0, 40))}</td>
+                        <td class="var-type">(${escapeHtml(c.args)}) → ${escapeHtml(c.result)}</td>
+                      </tr>
+                    `).join('')}
+                  </table>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Render CFG in left pane
+      requestAnimationFrame(() => {
+        if (!ir || !ir.blocks || !ir.blocks.length) return;
+
+        currentBlocks = ir.blocks; // Store for modal
+
+        const leftPane = document.querySelector('.split-left');
+        const container = leftPane.querySelector('.graph-container');
+        const svg = d3.select('.split-left svg');
+
+        const width = container.clientWidth || 500;
+        const height = container.clientHeight || 500;
+        svg.attr('width', width).attr('height', height);
+
+        const g = new dagreD3.graphlib.Graph().setGraph({
+          rankdir: 'TB', ranksep: 40, nodesep: 30, marginx: 20, marginy: 20,
+        });
+
+        ir.blocks.forEach((block, i) => {
+          // Annotate instructions with types
+          const annotated = block.instructions.slice(0, 5).map(instr => {
+            const clean = instr.replace(/\s*\[.*?\]\s*$/, '').trim();
+            const varMatch = clean.match(/^(\$?\w+(?:\.\d+)?)\s*=/);
+            if (varMatch && types.variables[varMatch[1]]) {
+              const truncated = clean.length > 35 ? clean.substring(0, 32) + '...' : clean;
+              return `${truncated}  : ${types.variables[varMatch[1]]}`;
+            }
+            return clean.length > 45 ? clean.substring(0, 42) + '...' : clean;
+          });
+          const label = annotated.join('\n') +
+            (block.instructions.length > 5 ? `\n... +${block.instructions.length - 5}` : '');
+
+          g.setNode(String(block.label), {
+            label: `Block ${block.label}\n─────────────\n${label}`,
+            class: i === 0 ? 'entry' : (block.successors.length === 0 ? 'exit' : ''),
+            labelStyle: 'font-size: 10px; font-family: monospace;',
+            rx: 6, ry: 6, padding: 10,
+          });
+        });
+
+        ir.blocks.forEach(block => {
+          block.successors.forEach((succ, i) => {
+            g.setEdge(String(block.label), String(succ), {
+              label: block.successors.length > 1 ? (i === 0 ? 'T' : 'F') : '',
+              labelStyle: 'font-size: 10px; fill: #8b949e;',
+              curve: d3.curveBasis,
+            });
+          });
+        });
+
+        const render = new dagreD3.render();
+        const svgGroup = svg.append('g');
+        render(svgGroup, g);
+
+        // Add click handlers to nodes
+        svgGroup.selectAll('.node').each(function(nodeLabel) {
+          d3.select(this).style('cursor', 'pointer').on('click', function() {
+            showBlockModal(nodeLabel);
+          });
+        });
+
+        const zoom = d3.zoom()
+          .scaleExtent([0.1, 3])
+          .on('zoom', () => svgGroup.attr('transform', d3.event.transform));
+        svg.call(zoom);
+
+        const graphWidth = g.graph().width || 200;
+        const graphHeight = g.graph().height || 200;
+        const scale = Math.min((width - 40) / graphWidth, (height - 40) / graphHeight, 1);
+        svg.call(zoom.transform, d3.zoomIdentity.translate(20, 20).scale(scale));
+      });
+    }
+
+    function renderLLVMSummary(analysis, raw) {
+      const total = analysis.total || 0;
+      const blocks = analysis.blocks || 0;
+      const phi = analysis.phi || 0;
+      const opcodes = analysis.opcodes || {};
+      const vectorOps = analysis.vector_ops || 0;
+      const vectorTypes = analysis.vector_types || [];
+      const calls = analysis.calls || {};
+
+      // Sort opcodes by count descending
+      const sorted = Object.entries(opcodes).sort((a, b) => b[1] - a[1]);
+
+      let text = '';
+      text += `═══════════════════════════════════════════\n`;
+      text += ` LLVM IR Summary\n`;
+      text += `═══════════════════════════════════════════\n`;
+      text += ` Instructions: ${total}    Blocks: ${blocks}    Phi: ${phi}\n`;
+      text += `───────────────────────────────────────────\n`;
+      text += ` OPCODES                          COUNT\n`;
+      text += `───────────────────────────────────────────\n`;
+
+      for (const [op, count] of sorted) {
+        text += ` ${op.padEnd(30)} ${String(count).padStart(5)}\n`;
+      }
+
+      text += `───────────────────────────────────────────\n`;
+
+      if (vectorOps > 0) {
+        text += ` VECTOR OPS: ${vectorOps}  (${vectorTypes.join(', ')})\n`;
+      }
+
+      if (Object.keys(calls).length > 0) {
+        const callStr = Object.entries(calls)
+          .sort((a, b) => b[1] - a[1])
+          .map(([fn, c]) => `${fn}(${c})`)
+          .join(', ');
+        text += ` CALLS: ${callStr}\n`;
+      }
+
+      text += `═══════════════════════════════════════════`;
+
+      outputEl.innerHTML = `<pre class="summary-mono">${escapeHtml(text)}</pre>`;
+    }
+
+    function renderAssemblySummary(analysis, raw) {
+      const total = analysis.total || 0;
+      const labels = analysis.labels || 0;
+      const mnemonics = analysis.mnemonics || {};
+      const registers = analysis.registers || {};
+      const memoryOps = analysis.memory_ops || {};
+
+      // Sort mnemonics by count descending
+      const sorted = Object.entries(mnemonics).sort((a, b) => b[1] - a[1]);
+
+      let text = '';
+      text += `═══════════════════════════════════════════\n`;
+      text += ` Assembly Summary\n`;
+      text += `═══════════════════════════════════════════\n`;
+      text += ` Instructions: ${total}    Labels: ${labels}\n`;
+      text += `───────────────────────────────────────────\n`;
+      text += ` MNEMONICS                        COUNT\n`;
+      text += `───────────────────────────────────────────\n`;
+
+      for (const [mnem, count] of sorted) {
+        text += ` ${mnem.padEnd(30)} ${String(count).padStart(5)}\n`;
+      }
+
+      text += `───────────────────────────────────────────\n`;
+
+      // Register usage
+      const regStr = `xmm(${registers.xmm || 0}) ymm(${registers.ymm || 0}) zmm(${registers.zmm || 0})`;
+      text += ` REGISTERS: ${regStr}\n`;
+
+      // Memory ops
+      text += ` MEMORY OPS: ${memoryOps.load || 0} load, ${memoryOps.store || 0} store\n`;
+
+      text += `═══════════════════════════════════════════`;
+
+      outputEl.innerHTML = `<pre class="summary-mono">${escapeHtml(text)}</pre>`;
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    async function compile() {
+      const code = codeEl.value;
+      compileBtn.disabled = true;
+      loading.style.display = 'flex';
+      outputEl.style.display = 'none';
+
+      try {
+        const resp = await fetch('/compile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+        results = await resp.json();
+        // Reset state for new compilation
+        currentPassIndex = 0;
+        selectedFunction = null;
+        render();
+      } catch (err) {
+        outputEl.innerHTML = `<div class="error-banner">Error: ${err.message}</div>`;
+      } finally {
+        compileBtn.disabled = false;
+        loading.style.display = 'none';
+        outputEl.style.display = 'block';
+      }
+    }
+
+    compileBtn.addEventListener('click', compile);
+    codeEl.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        compile();
+      }
+    });
+
+    // Keyboard navigation for passes
+    document.addEventListener('keydown', e => {
+      if (activeStage !== 'passes' || !results.passes?.parsed?.length) return;
+      if (document.activeElement === codeEl) return; // Don't interfere with editor
+      if (document.activeElement?.classList?.contains('func-selector')) return;
+
+      const passes = getFilteredPasses();
+      if (e.key === 'ArrowLeft' && currentPassIndex > 0) {
+        e.preventDefault();
+        currentPassIndex--;
+        updateToolbar();
+        renderPassGraph();
+      } else if (e.key === 'ArrowRight' && currentPassIndex < passes.length - 1) {
+        e.preventDefault();
+        currentPassIndex++;
+        updateToolbar();
+        renderPassGraph();
+      }
+    });
+  </script>
+</body>
+</html>
