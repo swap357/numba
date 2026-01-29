@@ -28,6 +28,10 @@ def vdot(a, b):
     return np.vdot(a, b)
 
 
+def matmul2(a, b):
+    return np.matmul(a, b)
+
+
 class TestProduct(EnableNRTStatsMixin, TestCase):
     """
     Tests for dot products.
@@ -305,6 +309,27 @@ class TestProduct(EnableNRTStatsMixin, TestCase):
         Test matrix @ matrix
         """
         self.check_dot_mm(matmul_usecase, None, "'@'")
+
+    @needs_blas
+    def test_np_matmul_vv(self):
+        """
+        Test np.matmul vector @ vector
+        """
+        self.check_dot_vv(matmul2, "np.matmul()")
+
+    @needs_blas
+    def test_np_matmul_vm(self):
+        """
+        Test np.matmul vector @ matrix and matrix @ vector
+        """
+        self.check_dot_vm(matmul2, None, "np.matmul()")
+
+    @needs_blas
+    def test_np_matmul_mm(self):
+        """
+        Test np.matmul matrix @ matrix
+        """
+        self.check_dot_mm(matmul2, None, "np.matmul()")
 
     @needs_blas
     def test_contiguity_warnings(self):
