@@ -828,6 +828,16 @@ def dot_3(a, b, out):
         return lambda a, b, out: _impl(a, b, out)
 
 
+@overload(np.matmul)
+def np_matmul(a, b):
+    """
+    np.matmul(a, b)
+    """
+    if not isinstance(a, types.Array) or not isinstance(b, types.Array):
+        return None
+    return dot_2_impl("np.matmul()", a, b)
+
+
 if config.USE_LEGACY_TYPE_SYSTEM:
     fatal_error_func = types.ExternalFunction("numba_fatal_error", types.intc())
 else:
