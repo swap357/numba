@@ -411,13 +411,12 @@ metadata = dict(
         "numba.cuda.tests.doc_examples.ffi": ["*.cu"],
         "numba.tests": ["pycc_distutils_usecase/*.py"],
         # Some C files are needed by pycc
-        "numba": ["*.c", "*.h"],
+        "numba": ["*.c", "*.h", "py.typed"],
         "numba.pycc": ["*.c", "*.h"],
         "numba.core.runtime": ["*.cpp", "*.c", "*.h"],
         "numba.cext": ["*.c", "*.h"],
         # numba gdb hook init command language file
         "numba.misc": ["cmdlang.gdb"],
-        "numba.typed": ["py.typed"],
         "numba.cuda" : ["cpp_function_wrappers.cu", "cuda_fp16.h",
                         "cuda_fp16.hpp"]
     },
