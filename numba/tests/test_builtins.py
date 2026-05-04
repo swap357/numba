@@ -880,8 +880,11 @@ class TestBuiltins(TestCase):
     def check_min_max_type_unification(self, pyfunc, func_name):
         with self.assertTypingError() as raises:
             njit(pyfunc)(np.bool_(True), np.datetime64('2020', 'Y'))
-        self.assertIn("Given types cannot be unified", str(raises.exception))
-    
+        self.assertIn(
+            "Given types cannot be unified: [bool, datetime64[Y]]",
+            str(raises.exception)
+        )
+
     def test_max_type_unification(self):
         self.check_min_max_type_unification(max_usecase1, "max")
 

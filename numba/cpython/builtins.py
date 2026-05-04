@@ -625,7 +625,7 @@ def max_vararg(context, x):
         sig = signature(retty, x)
         return sig, impl
     else:
-        raise TypingError("Given types cannot be unified")
+        raise TypingError(f"Given types cannot be unified: {[ty for ty in x]}")
 
 
 @intrinsic
@@ -643,7 +643,7 @@ def min_vararg(context, x):
         sig = signature(retty, x)
         return sig, impl
     else:
-        raise TypingError("Given types cannot be unified")
+        raise TypingError(f"Given types cannot be unified: {[ty for ty in x]}")
 
 
 # -----------------------------------------------------------------------------
