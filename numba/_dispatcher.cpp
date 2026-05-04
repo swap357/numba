@@ -1168,7 +1168,9 @@ call_cfunc(Dispatcher *self, PyObject *cfunc, PyObject *args, PyObject *kws, PyO
     PyObject *codelike = NULL;
     const bool enabled_sysmon = is_sysmon_enabled(self);
     int in_scope = 0;
-    PyMonitoringState mon_states[NUMBA_MON_COUNT];
+    // initialize mon_states as inactive; refresh_monitoring_scope skips
+    // writing them when the monitoring version is unchanged.
+    PyMonitoringState mon_states[NUMBA_MON_COUNT] = {};
     uint64_t mon_version = 0;
 
     assert(PyCFunction_Check(cfunc));
