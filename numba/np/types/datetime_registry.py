@@ -2,7 +2,8 @@ from numba.core.pythonapi import box, unbox, NativeValue
 from numba.core.types import UniTuple, BaseTuple, Number, Boolean
 from numba.np.types import NPDatetime, NPTimedelta
 from numba.core.extending import overload
-from numba.cpython.builtins import max_vararg, min_vararg
+from numba.cpython.builtins import max_vararg, min_vararg, cast_int
+from numba.core import errors
 
 
 @box(NPDatetime)
@@ -71,3 +72,20 @@ def ol_min_datetime(*x):
         def impl(*x):
             return min_vararg(x)
         return impl
+
+
+@overload(int)
+def ol_int(x):
+    if not isinstance(x, (NPDatetime, NPTimedelta)):
+        return
+
+    if isinstance(x, NPDatetime) and x.unit != 'ns':
+        raise errors.NumbaTypeError(
+            "Only datetime64[ns] can be converted,"
+            f" but got datetime64[{x.unit}]"
+        )
+
+    def impl(x):
+        return cast_int(x)
+
+    return impl
