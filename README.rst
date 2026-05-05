@@ -10,9 +10,9 @@ Numba
    :target: https://numba.discourse.group/
    :alt: Discourse
 
-.. image:: https://zenodo.org/badge/3659275.svg
-   :target: https://zenodo.org/badge/latestdoi/3659275
-   :alt: Zenodo DOI
+.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.19720971.svg
+   :target: https://doi.org/10.5281/zenodo.19720971
+   :alt: Zenodo
 
 .. image:: https://img.shields.io/pypi/v/numba.svg
    :target: https://pypi.python.org/pypi/numba/
