@@ -11,7 +11,7 @@ Numba
    :alt: Discourse
 
 .. image:: https://zenodo.org/badge/doi/10.5281/zenodo.19720971.svg
-   :target: https://doi.org/10.5281/zenodo.19720971
+   :target: https://doi.org/10.5281/zenodo.4343230
    :alt: Zenodo
 
 .. image:: https://img.shields.io/pypi/v/numba.svg
