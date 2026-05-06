@@ -681,6 +681,29 @@ class TestBuiltins(TestCase):
         with self.assertTypingError():
             self.test_int(flags=no_pyobj_flags)
 
+    def test_int_kws(self):
+        cfunc = njit(int_usecase)
+        with self.assertRaises(errors.TypingError):
+            cfunc('1234', base=10)
+
+    def test_int_preserve_type_usecase(self):
+        def pyfunc(x):
+            return int(x)
+
+        cfunc = njit(pyfunc)
+
+        for typ in [types.int32, types.int64, types.uint32, types.uint64]:
+            v = typ(1234)
+            self.assertEqual(cfunc(v), pyfunc(v))
+
+        for i in range(len(cfunc.signatures)):
+            sig = cfunc.signatures[i]
+            ov = cfunc.overloads[sig]
+
+            # Check that the return type is the same as the argument type,
+            # i.e. that int(x) does not widen the type of x.
+            self.assertIs(ov.signature.return_type, ov.signature.args[0])
+
     def test_iter_next(self, flags=forceobj_flags):
         pyfunc = iter_next_usecase
         cfunc = jit((types.UniTuple(types.int32, 3),), **flags)(pyfunc)
