@@ -10,7 +10,7 @@ Numba
    :target: https://numba.discourse.group/
    :alt: Discourse
 
-.. image:: https://zenodo.org/badge/doi/10.5281/zenodo.19720971.svg
+.. image:: https://zenodo.org/badge/doi/10.5281/zenodo.4343230.svg
    :target: https://doi.org/10.5281/zenodo.4343230
    :alt: Zenodo
 
