@@ -62,7 +62,7 @@ class GUFuncKernel(npyimpl._Kernel, Generic[_GUFuncT_co]):
 
 ###
 
-def make_gufunc_kernel(_dufunc: _GUFuncT) -> GUFuncKernel[_GUFuncT]: ...
+def make_gufunc_kernel(_dufunc: _GUFuncT) -> type[GUFuncKernel[_GUFuncT]]: ...
 
 class GUFuncLowerer(
     UfuncLowererBase[_GUFuncT_co, GUFuncKernel],
@@ -94,7 +94,6 @@ class GUFunc(
 ):
     __name__: str
     __doc__: str | None
-    reoderable: bool
 
     def __init__(
         self,

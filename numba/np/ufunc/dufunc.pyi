@@ -89,7 +89,7 @@ class UfuncAtIterator:
     def run(self, context: BaseContext, builder: IRBuilder) -> None: ...
     def need_advanced_indexing(self) -> None: ...
 
-def make_dufunc_kernel(_dufunc: _DUFuncT) -> DUFuncKernel[_DUFuncT]: ...
+def make_dufunc_kernel(_dufunc: _DUFuncT) -> type[DUFuncKernel[_DUFuncT]]: ...
 
 class DUFuncLowerer(
     UfuncLowererBase[_DUFuncT_co, DUFuncKernel],
@@ -122,7 +122,7 @@ class DUFunc(
 ):
     __name__: str
     __doc__: str | None
-    reoderable: bool
+    reorderable: bool
 
     def __init__(
         self,
