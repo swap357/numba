@@ -3,7 +3,6 @@ from collections.abc import Callable as _Callable
 from collections.abc import Mapping, Sequence
 from typing import Any, Final, Hashable, Iterable, NamedTuple, Self, TypeAlias
 
-import numpy as np
 from _typeshed import Incomplete
 from typing_extensions import Generic, TypeVar, override
 
@@ -28,12 +27,6 @@ _TupleT_co = TypeVar(
     "_TupleT_co",
     bound=tuple[Any, ...],
     default=tuple[Any, ...],
-    covariant=True,
-)
-_ScalarT_co = TypeVar(
-    "_ScalarT_co",
-    bound=np.generic,
-    default=np.generic,
     covariant=True,
 )
 
