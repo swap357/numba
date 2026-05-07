@@ -1220,6 +1220,7 @@ call_cfunc(Dispatcher *self, PyObject *cfunc, PyObject *args, PyObject *kws, PyO
         // Normal return. Refresh scope — events may have been toggled
         // during objmode.
         if (refresh_monitoring_scope(mon_states, &mon_version) < 0){
+            Py_CLEAR(pyresult);
             goto exit_scope;
         }
         if (PyMonitoring_FirePyReturnEvent(
