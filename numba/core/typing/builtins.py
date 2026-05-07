@@ -845,7 +845,7 @@ class TypeRefAttribute(AttributeTemplate):
 
     def resolve___call__(self, classty):
         """
-        Resolve a core number's constructor (e.g. calling int(...))
+        Resolve a Numba type reference's constructor (e.g. calling DictType(...))
 
         Note:
 
@@ -876,7 +876,6 @@ class TypeRefAttribute(AttributeTemplate):
 
             return types.Function(make_callable_template(key=ty,
                                                          typer=Redirect(self.context)))
-
 
 #------------------------------------------------------------------------------
 
