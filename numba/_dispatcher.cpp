@@ -617,11 +617,6 @@ call_cfunc(Dispatcher *self, PyObject *cfunc, PyObject *args, PyObject *kws, PyO
     trace_info.cframe.previous = prev_cframe;
 
     if (trace_info.cframe.use_tracing && tstate->c_profilefunc)
-#else
-    /*
-     * On Python prior to 3.10, tracing state is a member of the threadstate
-     */
-    if (tstate->use_tracing && tstate->c_profilefunc)
 #endif
     {
         /*
@@ -1263,11 +1258,7 @@ Dispatcher_call(Dispatcher *self, PyObject *args, PyObject *kws)
      * not compile one */
     int exact_match_required = self->can_compile ? 1 : self->exact_match_required;
 
-#if (PY_MAJOR_VERSION >= 3) && (PY_MINOR_VERSION >= 10)
     if (ts->tracing && ts->c_profilefunc) {
-#else
-    if (ts->use_tracing && ts->c_profilefunc) {
-#endif
         locals = PyEval_GetLocals();
         if (locals == NULL) {
             goto CLEANUP;
@@ -1381,11 +1372,7 @@ Dispatcher_cuda_call(Dispatcher *self, PyObject *args, PyObject *kws)
      * not compile one */
     int exact_match_required = self->can_compile ? 1 : self->exact_match_required;
 
-#if (PY_MAJOR_VERSION >= 3) && (PY_MINOR_VERSION >= 10)
     if (ts->tracing && ts->c_profilefunc) {
-#else
-    if (ts->use_tracing && ts->c_profilefunc) {
-#endif
         locals = PyEval_GetLocals();
         if (locals == NULL) {
             goto CLEANUP;
