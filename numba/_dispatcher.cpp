@@ -31,13 +31,13 @@
 
 #ifndef Py_BUILD_CORE
     #define Py_BUILD_CORE 1
-#endif
+#endif // Py_BUILD_CORE
 #include "internal/pycore_frame.h"
 // This is a fix suggested in the comments in https://github.com/python/cpython/issues/108216
 // specifically https://github.com/python/cpython/issues/108216#issuecomment-1696565797
 #ifdef HAVE_STD_ATOMIC
 #  undef HAVE_STD_ATOMIC
-#endif
+#endif // HAVE_STD_ATOMIC
 #undef _PyGC_FINALIZED
 
 /* dynamic_annotations.h is needed for building Python with --with-valgrind 
@@ -47,7 +47,7 @@
 #include "dynamic_annotations.h"
 #if (PY_MINOR_VERSION == 12)
     #include "internal/pycore_atomic.h"
-#endif
+#endif // (PY_MINOR_VERSION == 12)
 #include "internal/pycore_interp.h"
 #include "internal/pycore_pyerrors.h"
 #include "internal/pycore_instruments.h"
@@ -57,7 +57,7 @@
 #elif (PY_MAJOR_VERSION >= 3) && (PY_MINOR_VERSION == 11)
 #ifndef Py_BUILD_CORE
     #define Py_BUILD_CORE 1
-#endif
+#endif // Py_BUILD_CORE
 #include "internal/pycore_frame.h"
 #include "internal/pycore_pyerrors.h"
 
@@ -388,7 +388,7 @@ else                                                            \
 }
 
 
-#endif
+#endif // (PY_MAJOR_VERSION >= 3) && ((PY_MINOR_VERSION == 12) || (PY_MINOR_VERSION == 13) || (PY_MINOR_VERSION == 14))
 
 typedef std::vector<Type> TypeTable;
 typedef std::vector<PyObject*> Functions;
@@ -710,7 +710,7 @@ call_cfunc(Dispatcher *self, PyObject *cfunc, PyObject *args, PyObject *kws, PyO
      * On Python prior to 3.10, tracing state is a member of the threadstate
      */
     if (tstate->use_tracing && tstate->c_profilefunc)
-#endif
+#endif // (PY_MAJOR_VERSION >= 3) && (PY_MINOR_VERSION == 11)
     {
         /*
          * The following code requires some explaining:
@@ -734,7 +734,7 @@ call_cfunc(Dispatcher *self, PyObject *cfunc, PyObject *args, PyObject *kws, PyO
         PyObject *err_type = NULL;
         PyObject *err_value = NULL;
         PyObject *err_traceback = NULL;
-#endif
+#endif // (PY_MAJOR_VERSION >= 3) && ((PY_MINOR_VERSION == 10))
 
         if (!code) {
             PyErr_Format(PyExc_RuntimeError, "No __code__ attribute found.");
@@ -778,7 +778,7 @@ call_cfunc(Dispatcher *self, PyObject *cfunc, PyObject *args, PyObject *kws, PyO
             PyErr_Restore(err_type, err_value, err_traceback);
         }
         tstate->frame = frame->f_back;
-#endif
+#endif // (PY_MAJOR_VERSION >= 3) && (PY_MINOR_VERSION == 11)
     error:
         Py_XDECREF(frame);
         Py_XDECREF(globals);
@@ -1126,7 +1126,7 @@ call_cfunc(Dispatcher *self, PyObject *cfunc, PyObject *args, PyObject *kws, PyO
 }
 #else
 #error "Python version is not supported."
-#endif
+#endif // (PY_MAJOR_VERSION >= 3) && ((PY_MINOR_VERSION == 10) || (PY_MINOR_VERSION == 11))
 
 
 static
@@ -1314,7 +1314,7 @@ Dispatcher_call(Dispatcher *self, PyObject *args, PyObject *kws)
     if (ts->tracing && ts->c_profilefunc) {
 #else
     if (ts->use_tracing && ts->c_profilefunc) {
-#endif
+#endif // (PY_MAJOR_VERSION >= 3) && (PY_MINOR_VERSION >= 10)
         locals = PyEval_GetLocals();
         if (locals == NULL) {
             goto CLEANUP;
@@ -1432,7 +1432,7 @@ Dispatcher_cuda_call(Dispatcher *self, PyObject *args, PyObject *kws)
     if (ts->tracing && ts->c_profilefunc) {
 #else
     if (ts->use_tracing && ts->c_profilefunc) {
-#endif
+#endif // (PY_MAJOR_VERSION >= 3) && (PY_MINOR_VERSION >= 10)
         locals = PyEval_GetLocals();
         if (locals == NULL) {
             goto CLEANUP;
@@ -1610,23 +1610,23 @@ static PyTypeObject DispatcherType = {
  * https://github.com/python/cpython/issues/91051
  */
     0,                                           /* tp_watched */
-#endif
+#endif // (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION >= 12)
 #if (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION >= 13)
 /* This was introduced in 3.13
  * https://github.com/python/cpython/pull/114900
  */
     0,                                           /* tp_versions_used */
-#endif
+#endif // (PY_MAJOR_VERSION == 3) && (PY_MINOR_VERSION >= 13)
 
 /* WARNING: Do not remove this, only modify it! It is a version guard to
  * act as a reminder to update this struct on Python version update! */
 #if (PY_MAJOR_VERSION == 3)
 #if ! (NB_SUPPORTED_PYTHON_MINOR)
 #error "Python minor version is not supported."
-#endif
+#endif // ! (NB_SUPPORTED_PYTHON_MINOR)
 #else
 #error "Python major version is not supported."
-#endif
+#endif // (PY_MAJOR_VERSION == 3)
 /* END WARNING*/
 };
 
@@ -1636,7 +1636,7 @@ static
 bool is_sysmon_enabled(Dispatcher * self) {
     return self->enable_sysmon;
 }
-#endif
+#endif // (PY_MAJOR_VERSION >= 3) && ((PY_MINOR_VERSION == 12) || (PY_MINOR_VERSION == 13) || (PY_MINOR_VERSION == 14))
 
 static PyObject *compute_fingerprint(PyObject *self, PyObject *args)
 {
