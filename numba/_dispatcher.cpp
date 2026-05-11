@@ -1177,26 +1177,28 @@ call_cfunc(Dispatcher *self, PyObject *cfunc, PyObject *args, PyObject *kws, PyO
     assert(PyCFunction_GET_FLAGS(cfunc) == (METH_VARARGS | METH_KEYWORDS));
     fn = (PyCFunctionWithKeywords) PyCFunction_GET_FUNCTION(cfunc);
 
-    if (enabled_sysmon) {
-        if (refresh_monitoring_scope(mon_states, &mon_version) < 0) {
-            return NULL;
-        }
-        in_scope = 1;
+    if (!enabled_sysmon) {
+        return fn(PyCFunction_GET_SELF(cfunc), args, kws);
+    }
 
-        codelike = PyObject_GetAttrString((PyObject*)self, "__code__");
-        if (!codelike) {
-            goto exit_scope;
-        }
+    if (refresh_monitoring_scope(mon_states, &mon_version) < 0) {
+        return NULL;
+    }
+    in_scope = 1;
 
-        if (PyMonitoring_FirePyStartEvent(
+    codelike = PyObject_GetAttrString((PyObject*)self, "__code__");
+    if (codelike == NULL) {
+        goto exit_scope;
+    }
+
+    if (PyMonitoring_FirePyStartEvent(
                 &mon_states[NUMBA_MON_PY_START], codelike, 0) < 0) {
-            goto exit_scope;
-        }
+        goto exit_scope;
     }
 
     pyresult = fn(PyCFunction_GET_SELF(cfunc), args, kws);
 
-    if (enabled_sysmon && pyresult == NULL) {
+    if (pyresult == NULL) {
         // Exception path. Refresh scope — events may have been toggled
         // during objmode. Leave the exception on the error indicator;
         // Fire*Event reads it from tstate->current_exception internally.
@@ -1216,19 +1218,17 @@ call_cfunc(Dispatcher *self, PyObject *cfunc, PyObject *args, PyObject *kws, PyO
         goto exit_scope;
     }
 
-    if (enabled_sysmon) {
-        // Normal return. Refresh scope — events may have been toggled
-        // during objmode.
-        if (refresh_monitoring_scope(mon_states, &mon_version) < 0) {
-            Py_CLEAR(pyresult);
-            goto exit_scope;
-        }
-        if (PyMonitoring_FirePyReturnEvent(
-                &mon_states[NUMBA_MON_PY_RETURN], codelike, 0,
-                pyresult) < 0) {
-            Py_CLEAR(pyresult);
-            goto exit_scope;
-        }
+    // Normal return. Refresh scope — events may have been toggled
+    // during objmode.
+    if (refresh_monitoring_scope(mon_states, &mon_version) < 0) {
+        Py_CLEAR(pyresult);
+        goto exit_scope;
+    }
+    if (PyMonitoring_FirePyReturnEvent(
+            &mon_states[NUMBA_MON_PY_RETURN], codelike, 0,
+            pyresult) < 0) {
+        Py_CLEAR(pyresult);
+        goto exit_scope;
     }
 
 exit_scope:
