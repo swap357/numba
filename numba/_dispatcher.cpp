@@ -1181,7 +1181,7 @@ call_cfunc(Dispatcher *self, PyObject *cfunc, PyObject *args, PyObject *kws, PyO
         return fn(PyCFunction_GET_SELF(cfunc), args, kws);
     }
 
-    if (refresh_monitoring_scope(mon_states, &mon_version) < 0) {
+    if (refresh_monitoring_scope(mon_states, &mon_version) != 0) {
         return NULL;
     }
     in_scope = 1;
@@ -1192,7 +1192,7 @@ call_cfunc(Dispatcher *self, PyObject *cfunc, PyObject *args, PyObject *kws, PyO
     }
 
     if (PyMonitoring_FirePyStartEvent(
-                &mon_states[NUMBA_MON_PY_START], codelike, 0) < 0) {
+                &mon_states[NUMBA_MON_PY_START], codelike, 0) != 0) {
         goto exit_scope;
     }
 
@@ -1202,16 +1202,16 @@ call_cfunc(Dispatcher *self, PyObject *cfunc, PyObject *args, PyObject *kws, PyO
         // Exception path. Refresh scope — events may have been toggled
         // during objmode. Leave the exception on the error indicator;
         // Fire*Event reads it from tstate->current_exception internally.
-        if (refresh_monitoring_scope(mon_states, &mon_version) < 0) {
+        if (refresh_monitoring_scope(mon_states, &mon_version) != 0) {
             goto exit_scope;
         }
         if (PyErr_Occurred()) {
             if (PyMonitoring_FireRaiseEvent(
-                    &mon_states[NUMBA_MON_RAISE], codelike, 0) < 0) {
+                    &mon_states[NUMBA_MON_RAISE], codelike, 0) != 0) {
                 goto exit_scope;
             }
             if (PyMonitoring_FirePyUnwindEvent(
-                    &mon_states[NUMBA_MON_PY_UNWIND], codelike, 0) < 0) {
+                    &mon_states[NUMBA_MON_PY_UNWIND], codelike, 0) != 0) {
                 goto exit_scope;
             }
         }
@@ -1220,13 +1220,13 @@ call_cfunc(Dispatcher *self, PyObject *cfunc, PyObject *args, PyObject *kws, PyO
 
     // Normal return. Refresh scope — events may have been toggled
     // during objmode.
-    if (refresh_monitoring_scope(mon_states, &mon_version) < 0) {
+    if (refresh_monitoring_scope(mon_states, &mon_version) != 0) {
         Py_CLEAR(pyresult);
         goto exit_scope;
     }
     if (PyMonitoring_FirePyReturnEvent(
             &mon_states[NUMBA_MON_PY_RETURN], codelike, 0,
-            pyresult) < 0) {
+            pyresult) != 0) {
         Py_CLEAR(pyresult);
         goto exit_scope;
     }
