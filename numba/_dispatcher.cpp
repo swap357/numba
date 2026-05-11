@@ -300,94 +300,6 @@ else                                                            \
     }                                                           \
 }
 
-#else  // Python <3.10
-
-/*
- * Code originally from:
- * https://github.com/python/cpython/blob/d5650a1738fe34f6e1db4af5f4c4edb7cae90a36/Python/ceval.c#L4242-L4257
- */
-static int
-call_trace(Py_tracefunc func, PyObject *obj,
-           PyThreadState *tstate, PyFrameObject *frame,
-           int what, PyObject *arg)
-{
-    int result;
-    if (tstate->tracing)
-        return 0;
-    tstate->tracing++;
-    tstate->use_tracing = 0;
-    result = func(obj, frame, what, arg);
-    tstate->use_tracing = ((tstate->c_tracefunc != NULL)
-                           || (tstate->c_profilefunc != NULL));
-    tstate->tracing--;
-    return result;
-}
-
-/*
- * Code originally from:
- * https://github.com/python/cpython/blob/d5650a1738fe34f6e1db4af5f4c4edb7cae90a36/Python/ceval.c#L4220-L4240
- */
-static int
-call_trace_protected(Py_tracefunc func, PyObject *obj,
-                     PyThreadState *tstate, PyFrameObject *frame,
-                     int what, PyObject *arg)
-{
-    PyObject *type, *value, *traceback;
-    int err;
-    PyErr_Fetch(&type, &value, &traceback);
-    err = call_trace(func, obj, tstate, frame, what, arg);
-    if (err == 0)
-    {
-        PyErr_Restore(type, value, traceback);
-        return 0;
-    }
-    else
-    {
-        Py_XDECREF(type);
-        Py_XDECREF(value);
-        Py_XDECREF(traceback);
-        return -1;
-    }
-}
-
-/*
- * Code originally from:
- * https://github.com/python/cpython/blob/d5650a1738fe34f6e1db4af5f4c4edb7cae90a36/Python/ceval.c#L4520-L4549
- * NOTE: The state test https://github.com/python/cpython/blob/d5650a1738fe34f6e1db4af5f4c4edb7cae90a36/Python/ceval.c#L4521
- * has been removed, it's dealt with in call_cfunc.
- */
-#define C_TRACE(x, call)                                        \
-if (call_trace(tstate->c_profilefunc, tstate->c_profileobj,     \
-               tstate, tstate->frame, PyTrace_CALL, cfunc))     \
-    x = NULL;                                                   \
-else                                                            \
-{                                                               \
-    x = call;                                                   \
-    if (tstate->c_profilefunc != NULL)                          \
-    {                                                           \
-        if (x == NULL)                                          \
-        {                                                       \
-            call_trace_protected(tstate->c_profilefunc,         \
-                                 tstate->c_profileobj,          \
-                                 tstate, tstate->frame,         \
-                                 PyTrace_RETURN, cfunc);        \
-            /* XXX should pass (type, value, tb) */             \
-        }                                                       \
-        else                                                    \
-        {                                                       \
-            if (call_trace(tstate->c_profilefunc,               \
-                           tstate->c_profileobj,                \
-                           tstate, tstate->frame,               \
-                           PyTrace_RETURN, cfunc))              \
-            {                                                   \
-                Py_DECREF(x);                                   \
-                x = NULL;                                       \
-            }                                                   \
-        }                                                       \
-    }                                                           \
-}
-
-
 #endif
 
 typedef std::vector<Type> TypeTable;
@@ -705,11 +617,6 @@ call_cfunc(Dispatcher *self, PyObject *cfunc, PyObject *args, PyObject *kws, PyO
     trace_info.cframe.previous = prev_cframe;
 
     if (trace_info.cframe.use_tracing && tstate->c_profilefunc)
-#else
-    /*
-     * On Python prior to 3.10, tracing state is a member of the threadstate
-     */
-    if (tstate->use_tracing && tstate->c_profilefunc)
 #endif
     {
         /*
@@ -1351,11 +1258,7 @@ Dispatcher_call(Dispatcher *self, PyObject *args, PyObject *kws)
      * not compile one */
     int exact_match_required = self->can_compile ? 1 : self->exact_match_required;
 
-#if (PY_MAJOR_VERSION >= 3) && (PY_MINOR_VERSION >= 10)
     if (ts->tracing && ts->c_profilefunc) {
-#else
-    if (ts->use_tracing && ts->c_profilefunc) {
-#endif
         locals = PyEval_GetLocals();
         if (locals == NULL) {
             goto CLEANUP;
@@ -1469,11 +1372,7 @@ Dispatcher_cuda_call(Dispatcher *self, PyObject *args, PyObject *kws)
      * not compile one */
     int exact_match_required = self->can_compile ? 1 : self->exact_match_required;
 
-#if (PY_MAJOR_VERSION >= 3) && (PY_MINOR_VERSION >= 10)
     if (ts->tracing && ts->c_profilefunc) {
-#else
-    if (ts->use_tracing && ts->c_profilefunc) {
-#endif
         locals = PyEval_GetLocals();
         if (locals == NULL) {
             goto CLEANUP;
