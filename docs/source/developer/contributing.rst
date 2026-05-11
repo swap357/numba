@@ -11,7 +11,7 @@ Communication
 -------------
 
 Forum
-.....
+'''''
 
 Numba uses Discourse as a forum for longer running threads such as design
 discussions and roadmap planning. There are various categories available and it
