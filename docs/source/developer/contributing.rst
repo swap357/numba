@@ -10,26 +10,8 @@ questions, don't hesitate to ask them (see below).
 Communication
 -------------
 
-Real-time Chat
-''''''''''''''
-
-Numba uses Gitter for public real-time chat.  To help improve the
-signal-to-noise ratio, we have two channels:
-
-* `numba/numba <https://gitter.im/numba/numba>`_: General Numba discussion,
-  questions, and debugging help.
-* `numba/numba-dev <https://gitter.im/numba/numba-dev>`_: Discussion of PRs,
-  planning, release coordination, etc.
-
-Both channels are public, but we may ask that discussions on numba-dev move to
-the numba channel.  This is simply to ensure that numba-dev is easy for core
-developers to keep up with.
-
-Note that the Github issue tracker is the best place to report bugs.  Bug
-reports in chat are difficult to track and likely to be lost.
-
 Forum
-.....
+'''''
 
 Numba uses Discourse as a forum for longer running threads such as design
 discussions and roadmap planning. There are various categories available and it
@@ -92,7 +74,7 @@ When working with a source checkout of Numba you will also need a development
 build of llvmlite. These are available from the ``numba/label/dev`` channel on
 `anaconda.org <https://anaconda.org/numba/llvmlite>`_.
 
-To create an environment with the required dependencies, noting the use of the 
+To create an environment with the required dependencies, noting the use of the
 double-colon syntax (``numba/label/dev::llvmlite``) to install the latest
 development version of the llvmlite library::
 
@@ -312,7 +294,7 @@ Release Notes
 '''''''''''''
 
 Pull Requests that add significant user-facing modifications may need to be mentioned in the release notes.
-To add a release note, a short ``.rst`` file needs creating containing a summary of the change and it needs to be placed in 
+To add a release note, a short ``.rst`` file needs creating containing a summary of the change and it needs to be placed in
 ``docs/upcoming_changes``. The file ``docs/upcoming_changes/README.rst`` details the format
 and file naming conventions.
 
@@ -436,8 +418,7 @@ as to free up core developer time. Examples of ways to help:
   which essentially involves debugging the reported problem. Even if you cannot
   get right to the bottom of a problem, leaving notes about what was discovered
   for someone else is also helpful.
-* Answer questions/provide help for users on `discourse <https://numba.discourse.group/>`_
-  and/or `gitter.im <https://gitter.im/numba/numba>`_.
+* Answer questions/provide help for users on `discourse <https://numba.discourse.group/>`_.
 
 The core developers thank everyone for their understanding with the above!
 
