@@ -13,6 +13,14 @@ def run_shell(cmd):
     return out
 
 
+def assert_no_abs_lc_rpath(path):
+    lc_lines = run_shell('otool -l {}'.format(path)).decode().splitlines()
+    for i, line in enumerate(lc_lines):
+        if 'cmd LC_RPATH' in line:
+            assert not lc_lines[i + 2].split()[1].startswith('/'), \
+                'absolute LC_RPATH present in {}'.format(path)
+
+
 def main(whl):
     # Find shared libraries
     run_shell('wheel unpack {}'.format(whl))
@@ -53,6 +61,7 @@ def main(whl):
                     run_shell('install_name_tool -delete_rpath {} {}'.format(
                         lc_rpath, path))
                     updated_files.add(path)
+        assert_no_abs_lc_rpath(path)
 
     print('updated_files', updated_files)
     # Update whl
