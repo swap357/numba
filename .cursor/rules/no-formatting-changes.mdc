@@ -1,0 +1,96 @@
+---
+description: Critical policy - NO large-scale formatting changes
+alwaysApply: true
+---
+
+# 🚫 NO Large-Scale Formatting Changes
+
+## Policy
+
+Pull requests making large-scale code formatting changes are **REJECTED**.
+
+This is a **firm policy** adopted by core developers.
+
+## Why This Policy Exists
+
+1. **Merge Conflicts**: Formatting PRs create conflicts for other contributors
+2. **Review Burden**: Requires significant time/resources to verify changes don't break functionality
+3. **Priority**: Limited resources prioritized for bug fixes and features, not code tidiness
+4. **Test Preservation**: Some tests use intentionally non-ideal code to test compilation
+
+## What Counts as Large-Scale Formatting
+
+❌ **DO NOT**:
+- Reformat entire files or directories
+- Change quote styles across multiple files
+- Adjust whitespace throughout the codebase
+- Add/remove trailing commas project-wide
+- Bulk add/remove comments or docstrings
+- Mass rename variables for style consistency
+- Apply auto-formatters (black, autopep8) to existing code
+
+## What's Acceptable
+
+✅ **OK to do**:
+- Fix style issues in code you're modifying for other reasons
+- Follow PEP 8 for NEW code you write
+- Fix style in immediate context of your changes
+- Format code that's part of a meaningful feature/fix
+
+## Important Edge Cases
+
+### Intentional Non-Ideal Code
+
+Tests may contain code that looks "wrong" but is intentional:
+
+```python
+# This tests operator.eq with None - DO NOT CHANGE
+if x == None:  # noqa: E711
+    ...
+
+# This tests specific compilation behavior - DO NOT CHANGE
+def ugly_but_intentional():
+    x=1+2  # Tests parsing of no-space operators
+```
+
+**Rule**: If code is in a test file and looks intentional, leave it alone unless you're certain it's wrong.
+
+## Examples
+
+### ❌ BAD PR
+```
+Title: "Format all Python files with black"
+Changed: 150 files
+Lines changed: 5000+
+Actual functionality changed: 0
+```
+
+### ❌ BAD PR
+```
+Title: "Fix PEP 8 violations across codebase"
+Changed: 50 files
+Lines changed: 800+
+Actual functionality changed: 0
+```
+
+### ✅ GOOD PR
+```
+Title: "Fix numpy mean() bug with empty arrays"
+Changed: 2 files
+- numba/np/arraymath.py (bug fix + style cleanup in that function)
+- numba/tests/test_ufuncs.py (new tests)
+Lines changed: 50
+Actual functionality changed: Yes - fixed a bug
+```
+
+## If You Want to Improve Code Quality
+
+Instead of formatting, consider:
+- Reviewing PRs ([needs initial review](https://github.com/numba/numba/labels/needs%20initial%20review))
+- Fixing bugs ([good first issue](https://github.com/numba/numba/labels/good%20first%20issue))
+- Answering questions on Discourse
+- Writing documentation
+- Adding test coverage
+- Improving error messages
+
+These contributions are valued more than formatting changes.

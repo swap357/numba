@@ -1,0 +1,75 @@
+---
+description: Type hint conventions for Numba
+alwaysApply: true
+---
+
+# Type Hints in Numba
+
+Type hints are being gradually added to Numba using Mypy for static checking.
+
+## When to Add Type Hints
+
+**REQUIRED**: When modifying any file listed in `mypy.ini`, you MUST add type hints.
+
+Check if a file requires type hints:
+```bash
+grep "filename.py" mypy.ini
+```
+
+## Naming Convention
+
+Use `pt` prefix for built-in `typing` module imports to avoid confusion with Numba's own types:
+
+```python
+# ✅ GOOD - Prevents confusion with Numba types
+import typing as pt
+from typing import Optional as pt_Optional
+
+def process_data(x: pt_Optional[int]) -> pt.List[str]:
+    ...
+```
+
+```python
+# ❌ BAD - Could conflict with Numba's type system
+from typing import Optional, List
+
+def process_data(x: Optional[int]) -> List[str]:
+    ...
+```
+
+## Examples
+
+```python
+import typing as pt
+
+def compile_function(
+    func: pt.Callable,
+    signature: pt_Optional[str] = None,
+    **options: pt.Any
+) -> pt.Callable:
+    """
+    Compile a Python function.
+
+    Parameters
+    ----------
+    func : callable
+        The function to compile
+    signature : str, optional
+        Type signature for compilation
+    **options : dict
+        Additional compilation options
+
+    Returns
+    -------
+    callable
+        Compiled function
+    """
+    ...
+```
+
+## Gradual Adoption
+
+- Not all files have type hints yet
+- Only add hints when modifying checked files
+- Don't create PRs just to add type hints to unchecked files
+- Follow the project's gradual adoption strategy

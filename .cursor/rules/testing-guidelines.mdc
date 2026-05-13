@@ -1,0 +1,53 @@
+---
+description: 
+alwaysApply: true
+---
+
+# Numba Testing Guidelines
+
+Rules for writing and reviewing tests in the Numba codebase. Based on the [overloading guide](https://numba.readthedocs.io/en/stable/extending/overloading-guide.html#testing).
+
+## Exception Tests Must Disable Leak Checks
+
+Raising exceptions from jitted code leaks references. Any test that expects an exception from a jitted function **must** call `self.disable_leak_check()` before the exception-raising code.
+
+```python
+# ✅ GOOD
+def test_foo_raises(self):
+    self.disable_leak_check()
+    cfunc = jit(nopython=True)(some_func)
+    with self.assertRaises(SomeError):
+        cfunc(bad_input)
+
+# ❌ BAD - will fail tearDown with MemoryLeakMixin assertion
+def test_foo_raises(self):
+    cfunc = jit(nopython=True)(some_func)
+    with self.assertRaises(SomeError):
+        cfunc(bad_input)
+```
+
+Ideally, place all exception testing in a **separate test method** from the happy-path tests so the leak check is only disabled where needed.
+
+## Test Coverage Checklist
+
+When testing NumPy function implementations, cover:
+
+- Non-finite values (`nan`, `inf`, `-inf`)
+- Arrays with different shapes and layouts (C-contiguous, Fortran-contiguous)
+- Complex inputs
+- Scalar inputs
+- Empty arrays (`size == 0`)
+- Integer, float, and boolean dtypes
+- Types not explicitly documented (e.g. bool/complex when docs say float/int)
+
+## Use `assertPreciseEqual` Over Manual Checks
+
+Prefer `self.assertPreciseEqual(result, expected)` from `numba.tests.support.TestCase`. It handles NaN-aware comparison, exact dtype matching, and NaT comparison — avoids verbose `assertTrue(np.isnan(...))` chains.
+
+## Overload Method Reuse
+
+When a NumPy function is also an ndarray method (e.g. `np.repeat` / `a.repeat`), reuse the `@overload` implementation via `@overload_method` and verify NumPy doesn't diverge between function/method behavior.
+
+## NumPy Version Sensitivity
+
+CI tests across multiple NumPy versions. If behavior changed across versions, either branch on version or use a version gate with documentation noting which NumPy version Numba replicates.
