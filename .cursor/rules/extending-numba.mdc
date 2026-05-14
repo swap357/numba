@@ -1,0 +1,39 @@
+---
+description: How to add a new function/method/operator to numba
+alwaysApply: false
+---
+
+# Extending Numba
+
+API surface — `@overload`, `@overload_method`, `@overload_classmethod`, `@overload_attribute`, `@intrinsic`, `@register_jitable`, `@lower_builtin`, `@type_callable`, boxing/unboxing, `types.Any`, `types.VarArg`, numpy-overload guidance, exception-leak test handling — see:
+
+- `docs/source/extending/high-level.rst`
+- `docs/source/extending/low-level.rst`
+- `docs/source/extending/overloading-guide.rst`
+
+This rule covers only items not in those docs.
+
+## Preference
+
+1. `@overload` and its `@overload_*` siblings.
+2. `@intrinsic` for raw LLVM IR.
+3. Compose patterns below when typing is owned elsewhere.
+4. `@lower_builtin` standalone only when an existing typing template is registered.
+5. `compile_internal` is discouraged in new code: its forced signature silently coerces returns. Use `@overload` or the compose pattern.
+
+## Compose patterns
+
+- `@overload` + `lower_builtin` shim — typing is owned by a `ConcreteTemplate` that must not be modified.
+  - Lowering hops: `typing_context.resolve_value_type(stub)` → `.get_call_type(sig.args)` → `context.get_function(...)` → call.
+  - Examples: `numba/np/npyfuncs.py:407`, `numba/np/arrayobj.py:3082`, `complex_mul_impl` in `numba/np/math/numbers.py` paired with `BinOpMul` in `numba/core/typing/builtins.py`.
+
+- `@intrinsic` + `@overload_method` — raw IR exposed under a method name. Overload body: `return lambda self, *a: _intrinsic_impl(self, *a)`. Example: `_set_discard` in `numba/cpython/setobj.py`.
+
+## Compile-time vs runtime
+
+- The `@overload` body and `@intrinsic` outer run at compile time with **types**.
+- The returned `impl` and `codegen` run at runtime.
+- In the outer: branch on types, read type attributes (`arr.ndim`, `arr.dtype`, `lit.literal_value`), derive constants, and select the algorithm. Return one specialised `impl`.
+- Branches inside `impl` that depend only on types may fail typing (e.g. `arr.sum(axis=0)` on a 1-D array).
+
+For NumPy test coverage and exception-leak handling: `testing-guidelines.mdc`.
