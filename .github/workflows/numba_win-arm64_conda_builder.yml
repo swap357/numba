@@ -7,7 +7,6 @@ on:
     paths:
       - .github/workflows/numba_win-arm64_conda_builder.yml
       - buildscripts/condarecipe.local/**
-      - buildscripts/github/evaluate.py
   workflow_dispatch:
     inputs:
       llvmlite_run_id:
@@ -22,39 +21,18 @@ concurrency:
 env:
   CONDA_CHANNEL_LLVMLITE: swap357
   WIN_ARM64_CONDA_CHANNEL: bootstrap-win-arm64-round-2-native
+  PYTHON_VERSION: "3.14"
+  NUMPY_VERSION: "2.4.6"
 
 jobs:
-  load-matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      build-matrix-json: ${{ steps.parse_matrix.outputs.build-matrix-json }}
-      test-matrix-json: ${{ steps.parse_matrix.outputs.test-matrix-json }}
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
-      - id: parse_matrix
-        name: Parse Workflow Matrix JSON
-        env:
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-          GITHUB_WORKFLOW_INPUT: ${{ toJson(github.event.inputs) }}
-          GITHUB_PLATFORM: win-arm64
-          GITHUB_PKG_TYPE: conda
-        run: |
-          python buildscripts/github/evaluate.py
-
   win-arm64-build-conda:
-    name: win-arm64-build-conda (py ${{ matrix.python_version_full }}, np ${{ matrix.numpy_build }})
-    needs: load-matrix
+    name: win-arm64-build-conda (py 3.14, np 2.4.6)
     runs-on: windows-11-arm
     env:
       EXTRA_CHANNELS: ''
     defaults:
       run:
         shell: bash -elx {0}
-    strategy:
-      matrix:
-        include: ${{ fromJson(needs.load-matrix.outputs.build-matrix-json) }}
-      fail-fast: false
 
     steps:
       - name: Clone repository
@@ -84,7 +62,7 @@ jobs:
         if: ${{ inputs.llvmlite_run_id != '' }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: llvmlite-win-arm64-py${{ matrix.python_major_minor }}
+          name: llvmlite-win-arm64-py${{ env.PYTHON_VERSION }}
           path: llvmlite_conda
           run-id: ${{ inputs.llvmlite_run_id }}
           repository: swap357/llvmlite
@@ -109,8 +87,8 @@ jobs:
 
           conda-build --debug -c $LLVMLITE_CHANNEL "${extra_args[@]}" \
             -c "${WIN_ARM64_CONDA_CHANNEL}" -c m2-winarm64 -c defaults \
-            --python=${{ matrix.python_version_full }} \
-            --numpy=${{ matrix.numpy_build }} \
+            --python=${PYTHON_VERSION} \
+            --numpy=${NUMPY_VERSION} \
             buildscripts/condarecipe.local/ \
             --output-folder=$CONDA_CHANNEL_DIR \
             --no-test
@@ -118,25 +96,21 @@ jobs:
       - name: Upload numba conda package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: numba_win-arm64_conda_py${{ matrix.python_major_minor }}
+          name: numba_win-arm64_conda_py${{ env.PYTHON_VERSION }}
           path: conda_channel_dir
           compression-level: 0
           retention-days: 7
           if-no-files-found: error
 
   win-arm64-test:
-    name: win-arm64-test-conda (py ${{ matrix.python_version_full }}, np ${{ matrix.numpy_test }})
-    needs: [load-matrix, win-arm64-build-conda]
+    name: win-arm64-test-conda (py 3.14, np 2.4.6)
+    needs: win-arm64-build-conda
     runs-on: windows-11-arm
     env:
       EXTRA_CHANNELS: ''
     defaults:
       run:
         shell: bash -elx {0}
-    strategy:
-      matrix:
-        include: ${{ fromJson(needs.load-matrix.outputs.test-matrix-json) }}
-      fail-fast: false
 
     steps:
       - name: Set up conda-standalone
@@ -161,7 +135,7 @@ jobs:
         if: ${{ inputs.llvmlite_run_id != '' }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: llvmlite-win-arm64-py${{ matrix.python_major_minor }}
+          name: llvmlite-win-arm64-py${{ env.PYTHON_VERSION }}
           path: llvmlite_conda
           run-id: ${{ inputs.llvmlite_run_id }}
           repository: swap357/llvmlite
@@ -170,7 +144,7 @@ jobs:
       - name: Download numba artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: numba_win-arm64_conda_py${{ matrix.python_major_minor }}
+          name: numba_win-arm64_conda_py${{ env.PYTHON_VERSION }}
 
       - name: Run tests
         env:
@@ -197,7 +171,7 @@ jobs:
 
           conda-build -c $LLVMLITE_CHANNEL "${extra_args[@]}" \
             -c "${WIN_ARM64_CONDA_CHANNEL}" -c m2-winarm64 -c defaults \
-            --python=${{ matrix.python_version_full }} \
-            --extra-deps numpy=${{ matrix.numpy_test }} \
+            --python=${PYTHON_VERSION} \
+            --extra-deps numpy=${NUMPY_VERSION} \
             --test \
             "$NUMBA_PKG"

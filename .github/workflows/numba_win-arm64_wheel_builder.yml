@@ -6,7 +6,6 @@ on:
   pull_request:
     paths:
       - .github/workflows/numba_win-arm64_wheel_builder.yml
-      - buildscripts/github/evaluate.py
       - setup.py
   workflow_dispatch:
     inputs:
@@ -23,37 +22,16 @@ env:
   ARTIFACT_RETENTION_DAYS: 7
   WHEELS_INDEX_URL: https://pypi.anaconda.org/swap357/simple
   WIN_ARM64_CONDA_CHANNEL: bootstrap-win-arm64-round-2-native
+  PYTHON_VERSION: "3.14"
+  NUMPY_VERSION: "2.4.6"
 
 jobs:
-  load-matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      build-matrix-json: ${{ steps.load_matrix_json.outputs.build-matrix-json }}
-      test-matrix-json: ${{ steps.load_matrix_json.outputs.test-matrix-json }}
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
-      - id: load_matrix_json
-        name: Load Workflow Matrix JSON
-        env:
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-          GITHUB_WORKFLOW_INPUT: ${{ toJson(github.event.inputs) }}
-          GITHUB_PLATFORM: win-arm64
-          GITHUB_PKG_TYPE: wheel
-        run: |
-          python buildscripts/github/evaluate.py
-
   win-arm64-build:
-    name: win-arm64-build-wheel (py ${{ matrix.python_version_full }}, np ${{ matrix.numpy_build }})
-    needs: load-matrix
+    name: win-arm64-build-wheel (py 3.14, np 2.4.6)
     runs-on: windows-11-arm
     defaults:
       run:
         shell: bash -el {0}
-    strategy:
-      matrix:
-        include: ${{ fromJson(needs.load-matrix.outputs.build-matrix-json) }}
-      fail-fast: false
 
     steps:
       - name: Clone repository
@@ -72,7 +50,7 @@ jobs:
         if: inputs.llvmlite_wheel_runid != ''
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: llvmlite-win-arm64-py${{ matrix.python_major_minor }}
+          name: llvmlite-win-arm64-py${{ env.PYTHON_VERSION }}
           path: llvmlite_wheels
           run-id: ${{ inputs.llvmlite_wheel_runid }}
           repository: swap357/llvmlite
@@ -83,7 +61,7 @@ jobs:
           export CONDA_PREFIX="${RUNNER_TEMP}/conda-build-env"
           "${CONDA_EXE}" create --prefix "${CONDA_PREFIX}" \
             -c "${WIN_ARM64_CONDA_CHANNEL}" -c m2-winarm64 -c main \
-            --yes "python=${{ matrix.python_version_full }}" pip
+            --yes "python=${PYTHON_VERSION}" pip
           echo "CONDA_PREFIX=${CONDA_PREFIX}" >> "${GITHUB_ENV}"
           export PATH="${CONDA_PREFIX}/Scripts:${CONDA_PREFIX}/Library/bin:${CONDA_PREFIX}:${PATH}"
           echo "${CONDA_PREFIX}/Library/bin" >> "${GITHUB_PATH}"
@@ -94,7 +72,8 @@ jobs:
           else
             python -m pip install -i ${{ env.WHEELS_INDEX_URL }} llvmlite
           fi
-          python -m pip install build numpy==${{ matrix.numpy_build }} setuptools wheel tbb==2021.6 tbb-devel==2021.6
+          python -m pip install --pre numpy==${NUMPY_VERSION}
+          python -m pip install build setuptools wheel tbb==2021.6 tbb-devel==2021.6
 
       - name: Build wheel
         run: python -m build --wheel --no-isolation
@@ -102,23 +81,19 @@ jobs:
       - name: Upload numba wheel
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: numba_win-arm64_wheel_py${{ matrix.python_major_minor }}
+          name: numba_win-arm64_wheel_py${{ env.PYTHON_VERSION }}
           path: dist/*.whl
           compression-level: 0
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
           if-no-files-found: error
 
   win-arm64-test:
-    name: win-arm64-test-wheel (py ${{ matrix.python_version_full }}, np ${{ matrix.numpy_test }})
-    needs: [load-matrix, win-arm64-build]
+    name: win-arm64-test-wheel (py 3.14, np 2.4.6)
+    needs: win-arm64-build
     runs-on: windows-11-arm
     defaults:
       run:
         shell: bash -el {0}
-    strategy:
-      matrix:
-        include: ${{ fromJson(needs.load-matrix.outputs.test-matrix-json) }}
-      fail-fast: false
 
     steps:
       - name: Set up conda-standalone
@@ -131,14 +106,14 @@ jobs:
       - name: Download Numba wheel artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: numba_win-arm64_wheel_py${{ matrix.python_major_minor }}
+          name: numba_win-arm64_wheel_py${{ env.PYTHON_VERSION }}
           path: dist
 
       - name: Download llvmlite wheel
         if: inputs.llvmlite_wheel_runid != ''
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: llvmlite-win-arm64-py${{ matrix.python_major_minor }}
+          name: llvmlite-win-arm64-py${{ env.PYTHON_VERSION }}
           path: llvmlite_wheels
           run-id: ${{ inputs.llvmlite_wheel_runid }}
           repository: swap357/llvmlite
@@ -149,7 +124,7 @@ jobs:
           export CONDA_PREFIX="${RUNNER_TEMP}/conda-base"
           "${CONDA_EXE}" create --prefix "${CONDA_PREFIX}" \
             -c "${WIN_ARM64_CONDA_CHANNEL}" -c m2-winarm64 -c main \
-            --yes "python=${{ matrix.python_version_full }}" pip wheel
+            --yes "python=${PYTHON_VERSION}" pip wheel
           echo "CONDA_PREFIX=${CONDA_PREFIX}" >> "${GITHUB_ENV}"
           export PATH="${CONDA_PREFIX}/Scripts:${CONDA_PREFIX}/Library/bin:${CONDA_PREFIX}:${PATH}"
           echo "${CONDA_PREFIX}/Library/bin" >> "${GITHUB_PATH}"
@@ -162,7 +137,7 @@ jobs:
           _NUMBA_REDUCED_TESTING: 1
         run: |
           python -m pip install --upgrade pip twine
-          python -m pip install numpy==${{ matrix.numpy_test }} tbb==2021.6 tbb-devel==2021.6
+          python -m pip install --pre numpy==${NUMPY_VERSION} tbb==2021.6 tbb-devel==2021.6
           if [ "${{ inputs.llvmlite_wheel_runid }}" != "" ]; then
             python -m pip install llvmlite_wheels/*.whl
           else
