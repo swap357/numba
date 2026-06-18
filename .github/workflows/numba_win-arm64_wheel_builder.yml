@@ -21,7 +21,7 @@ concurrency:
 
 env:
   ARTIFACT_RETENTION_DAYS: 7
-  WHEELS_INDEX_URL: https://pypi.anaconda.org/numba/label/dev/simple
+  WHEELS_INDEX_URL: https://pypi.anaconda.org/swapnil357/simple
   WIN_ARM64_CONDA_CHANNEL: bootstrap-win-arm64-round-2-native
   PYTHON_VERSION: "3.14"
   NUMPY_VERSION: "2.3.0"
