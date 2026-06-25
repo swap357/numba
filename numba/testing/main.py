@@ -20,6 +20,7 @@ from unittest import result, runner, signals, suite, loader, case
 from .loader import TestLoader
 from numba.core import config
 from numba.misc import memoryutils
+from numba.misc import compiletimeutils
 
 try:
     from multiprocessing import TimeoutError
@@ -151,6 +152,7 @@ class SerialSuite(unittest.TestSuite):
     def __init__(self, tests=()):
         super(SerialSuite, self).__init__(tests)
         self.resource_infos = []
+        self.compile_infos = []
 
     def addTest(self, test):
         if not isinstance(test, unittest.TestCase):
@@ -164,13 +166,17 @@ class SerialSuite(unittest.TestSuite):
 
     def run(self, result):
         # Run each test with memory tracking
+        if _SHOW_COMPILE_TIMING:
+            _warmup_numba_compile()
         for test in self:
             if result.shouldStop:
                 break
             memtrack = memoryutils.MemoryTracker(test.id())
-            with memtrack.monitor():
+            comptrack = compiletimeutils.CompileTimeTracker(test.id())
+            with memtrack.monitor(), comptrack.monitor():
                 test(result)
             self.resource_infos.append(memtrack.get_summary())
+            self.compile_infos.append(comptrack.get_summary())
         return result
 
 
@@ -654,7 +660,7 @@ class _MinimalResult(object):
     __slots__ = (
         'failures', 'errors', 'skipped', 'expectedFailures',
         'unexpectedSuccesses', 'stream', 'shouldStop', 'testsRun',
-        'test_id', 'resource_info')
+        'test_id', 'resource_info', 'compile_info')
 
     def fixup_case(self, case):
         """
@@ -663,7 +669,8 @@ class _MinimalResult(object):
         # Python 3.3 doesn't reset this one.
         case._outcomeForDoCleanups = None
 
-    def __init__(self, original_result, test_id=None, resource_info=None):
+    def __init__(self, original_result, test_id=None, resource_info=None,
+                 compile_info=None):
         for attr in self.__slots__:
             setattr(self, attr, getattr(original_result, attr, None))
         for case, _ in self.expectedFailures:
@@ -674,6 +681,7 @@ class _MinimalResult(object):
             self.fixup_case(case)
         self.test_id = test_id
         self.resource_info = resource_info
+        self.compile_info = compile_info
 
 
 class _FakeStringIO(object):
@@ -703,6 +711,8 @@ class _MinimalRunner(object):
 
     def __call__(self, test):
         # Executed in child process
+        if _SHOW_COMPILE_TIMING:
+            _warmup_numba_compile()
         kwargs = self.runner_args
         # Force recording of output in a buffer (it will be printed out
         # by the parent).
@@ -714,15 +724,17 @@ class _MinimalRunner(object):
         signals.registerResult(result)
         result.failfast = runner.failfast
         result.buffer = runner.buffer
-        # Create a per-process memory tracker to avoid global state issues
+        # Create per-process trackers to avoid global state issues
         memtrack = memoryutils.MemoryTracker(test.id())
-        with memtrack.monitor():
+        comptrack = compiletimeutils.CompileTimeTracker(test.id())
+        with memtrack.monitor(), comptrack.monitor():
             with self.cleanup_object(test):
                 test(result)
         # HACK as cStringIO.StringIO isn't picklable in 2.x
         result.stream = _FakeStringIO(result.stream.getvalue())
         return _MinimalResult(result, test.id(),
-                              resource_info=memtrack.get_summary())
+                              resource_info=memtrack.get_summary(),
+                              compile_info=comptrack.get_summary())
 
     @contextlib.contextmanager
     def cleanup_object(self, test):
@@ -769,6 +781,27 @@ def _split_nonparallel_tests(test, sliced):
 # A test can't run longer than 10 minutes
 _TIMEOUT = 1200
 
+# Opt-in per-test compile/run timing summary, printed by ParallelTestRunner.
+_SHOW_COMPILE_TIMING = (
+    os.environ.get("NUMBA_TEST_COMPILE_TIMING") not in (None, "", "0"))
+
+# Per-process one-shot: warm up numba's lazy init before any test is timed, so
+# the first test in a worker isn't charged for process-wide setup (~hundreds of
+# ms). Only runs when timing is enabled; never alters a normal test run.
+_numba_warmed = False
+
+
+def _warmup_numba_compile():
+    global _numba_warmed
+    if _numba_warmed:
+        return
+    _numba_warmed = True
+    try:
+        from numba import njit
+        njit(lambda x: x + 1)(0)
+    except Exception:
+        pass  # best-effort; a warm-up failure must never fail the run
+
 class ParallelTestRunner(runner.TextTestRunner):
     """
     A test runner which delegates the actual running to a pool of child
@@ -785,6 +818,7 @@ class ParallelTestRunner(runner.TextTestRunner):
         self.useslice = parse_slice(useslice)
         self.runner_args = kwargs
         self.resource_infos = []
+        self.compile_infos = []
 
     def _run_inner(self, result):
         # We hijack TextTestRunner.run()'s inner logic by passing this
@@ -823,6 +857,7 @@ class ParallelTestRunner(runner.TextTestRunner):
                 stests.run(result)
                 # Add serial test resource infos to the main collection
                 self.resource_infos.extend(stests.resource_infos)
+                self.compile_infos.extend(stests.compile_infos)
                 return result
         finally:
             # Always display the resource infos
@@ -836,6 +871,17 @@ class ParallelTestRunner(runner.TextTestRunner):
                     traceback.print_exc()
                 finally:
                     print("=== End Resource Infos ===")
+            # Compile/run timing summary (opt-in; needs no external deps)
+            if _SHOW_COMPILE_TIMING:
+                try:
+                    print("=== Compile Times ===")
+                    for ci in self.compile_infos:
+                        print(ci)
+                except Exception:
+                    print("ERROR: Ignored exception in printing compile times")
+                    traceback.print_exc()
+                finally:
+                    print("=== End Compile Times ===")
 
     def _run_parallel_tests(self, result, pool, child_runner, tests):
         remaining_ids = set(t.id() for t in tests)
@@ -856,6 +902,7 @@ class ParallelTestRunner(runner.TextTestRunner):
             else:
                 result.add_results(child_result)
                 self.resource_infos.append(child_result.resource_info)
+                self.compile_infos.append(child_result.compile_info)
                 remaining_ids.discard(child_result.test_id)
                 if child_result.shouldStop:
                     result.shouldStop = True
