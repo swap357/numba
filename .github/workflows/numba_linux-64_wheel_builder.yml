@@ -200,14 +200,21 @@ jobs:
           # print Numba system information
           $PYTHON_PATH -m numba -s
 
-          # run tests, capturing the compile-time summary for upload
+          # run tests; tee to a log so a later step can pull the compile-time
+          # summary. No explicit `exit`: an explicit exit in this login shell
+          # runs /etc/bash.bash_logout -> clear_console, which returns 1 on the
+          # runner and would fail the step even when tests pass. Keeping the
+          # piped command as the last line preserves the test's exit status.
           set -o pipefail
-          rc=0
           NUMBA_TEST_COMPILE_TIMING=1 $PYTHON_PATH -m numba.runtests -m 4 -v \
-              2>&1 | tee runtests.log || rc=$?
+              2>&1 | tee runtests.log
+
+      - name: Extract compile-time metrics
+        if: always()
+        shell: bash
+        run: |
           awk '/=== Compile Times ===/,/=== End Compile Times ===/' \
               runtests.log > compile_times.txt || true
-          exit "$rc"
 
       - name: Upload compile-time metrics
         if: always()
