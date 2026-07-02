@@ -143,7 +143,4 @@ jobs:
           python -m numba -s
 
           # run the tests previously skipped via skip_win_arm64_unittuple_uimm12
-          python -m numba.runtests -v \
-            numba.tests.test_sets.TestUnicodeSets.test_isdisjoint \
-            numba.tests.test_sets.TestUnicodeSets.test_issubset \
-            numba.tests.test_sets.TestUnicodeSets.test_issuperset
+          python -m numba.runtests -v -m 4
