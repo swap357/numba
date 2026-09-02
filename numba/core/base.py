@@ -412,7 +412,6 @@ class BaseContext(object):
     def declare_function(self, module, fndesc):
         fnty = self.call_conv.get_function_type(fndesc.restype, fndesc.argtypes)
         fn = cgutils.get_or_insert_function(module, fnty, fndesc.mangled_name)
-        self.apply_target_attributes(fn, fndesc.argtypes, fndesc.restype)
         self.call_conv.decorate_function(fn, fndesc.args, fndesc.argtypes, noalias=fndesc.noalias)
         if fndesc.inline:
             fn.attributes.add('alwaysinline')
@@ -432,6 +431,7 @@ class BaseContext(object):
         fnty = self.get_external_function_type(fndesc)
         fn = cgutils.get_or_insert_function(module, fnty, fndesc.mangled_name)
         assert fn.is_declaration
+        self.apply_target_attributes(fn, fndesc.argtypes, fndesc.restype)
         for ak, av in zip(fndesc.args, fn.args):
             av.name = "arg.%s" % ak
         return fn
