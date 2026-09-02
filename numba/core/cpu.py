@@ -18,6 +18,52 @@ from numba.core.cpu_options import (ParallelOptions, # noqa F401
                                     FastMathOptions, InlineOptions) # noqa F401
 from numba.np import ufunc_db
 
+# Platform-wise signext/zeroext (issue #10802):
+# https://gist.github.com/sklam/17dd8d44294045e3644b43bcf9b7060a
+
+
+def _ext_attr(signed):
+    return 'signext' if signed else 'zeroext'
+
+
+def argext(triple, width, signed, is_param=True):
+    arch = triple.split('-')[0].lower()
+    win = 'windows' in triple.lower()
+
+    # aarch64, win64: no attributes
+    if arch in ('aarch64', 'arm64') or (arch in ('x86_64', 'amd64') and win):
+        return None
+
+    # x86_64-linux, i386, armv7, ppc32: i8/i16 only
+    if arch in ('x86_64', 'amd64', 'i386', 'i686', 'armv7', 'armv7l',
+                'arm', 'powerpc', 'ppc32', 'ppc'):
+        return _ext_attr(signed) if width < 32 else None
+
+    # s390x, ppc64: i8..i32, signedness as usual
+    if arch in ('s390x', 'ppc64', 'ppc64le', 'powerpc64', 'powerpc64le'):
+        return _ext_attr(signed) if width < 64 else None
+
+    # riscv64, loongarch64: like s390x, but i32/u32 are both signext
+    if arch in ('riscv64', 'loongarch64'):
+        if width >= 64:
+            return None
+        if width == 32:
+            return 'signext'
+        return _ext_attr(signed)
+
+    # mips64 n64: like riscv, plus i64/u64 on parameters
+    if arch in ('mips64', 'mips64el'):
+        if width == 64:
+            return _ext_attr(signed) if is_param else None
+        if width == 32:
+            return 'signext'
+        if width < 32:
+            return _ext_attr(signed)
+        return None
+
+    return None
+
+
 # Keep those structures in sync with _dynfunc.c.
 
 
@@ -63,41 +109,27 @@ class CPUContext(BaseContext):
         externals.c_math_functions.install(self)
 
     def apply_target_attributes(self, llvm_func, argtypes=None, restype=None):
-        """
-        Implementation of caller Type Promotions for s390x ABI requirement.
-        See https://github.com/numba/numba/issues/9640
-
-        On s390x, the ABI requires that any integer argument or return
-        value smaller than 64 bits must be promoted to 64 bits by the caller.
-        The callee can then safely assume the high-order bits of the register
-        are correctly filled (sign-extended or zero-extended).
-        Without these attributes, LLVM may leave garbage in the high bits,
-        leading to undefined behavior (e.g., segfaults) when the callee
-        performs 64-bit operations on 32-bit values.
-        """
-        if self.address_size == 64 and platform.machine() == 's390x':
-            def get_ext_attr(numba_ty):
-                """
-                Map Numba types to LLVM extension attributes.
-                Signed integers -> signext (sign extension)
-                Unsigned/Booleans -> zeroext (zero extension)
-                """
-                if isinstance(numba_ty, types.Integer):
-                    return 'signext' if numba_ty.signed else 'zeroext'
-                return 'signext' # Default fallback
-
-            # Handle Arguments: i32 and smaller must be extended to 64-bit
-            for i, arg in enumerate(llvm_func.args):
-                if isinstance(arg.type, ir.IntType) and arg.type.width < 64:
-                    n_ty = None
-                    if argtypes and i < len(argtypes):
-                        n_ty = argtypes[i]
-                    arg.add_attribute(get_ext_attr(n_ty))
-
-            # Handle Return Value
-            retty = llvm_func.return_value.type
-            if isinstance(retty, ir.IntType) and retty.width < 64:
-                llvm_func.return_value.add_attribute(get_ext_attr(restype))
+        # JIT<->C only. Not Numba's internal CC (declare_function).
+        triple = ll.get_process_triple()
+        for i, arg in enumerate(llvm_func.args):
+            if not isinstance(arg.type, ir.IntType):
+                continue
+            ty = (argtypes[i] if argtypes is not None and i < len(argtypes)
+                  else None)
+            signed = (False if isinstance(ty, types.Boolean)
+                      else getattr(ty, 'signed', True))
+            attr = argext(triple, arg.type.width, signed, True)
+            if (attr and 'signext' not in arg.attributes
+                    and 'zeroext' not in arg.attributes):
+                arg.add_attribute(attr)
+        retty = llvm_func.return_value.type
+        if isinstance(retty, ir.IntType):
+            signed = (False if isinstance(restype, types.Boolean)
+                      else getattr(restype, 'signed', True))
+            attr = argext(triple, retty.width, signed, False)
+            if (attr and 'signext' not in llvm_func.return_value.attributes
+                    and 'zeroext' not in llvm_func.return_value.attributes):
+                llvm_func.return_value.add_attribute(attr)
 
     def load_additional_registries(self):
         # Only initialize the NRT once something is about to be compiled. The
@@ -245,6 +277,7 @@ class CPUContext(BaseContext):
         wrapty = ir.FunctionType(ll_return_type, ll_argtypes)
         wrapfn = ir.Function(wrapper_module, wrapty,
                              fndesc.llvm_cfunc_wrapper_name)
+        self.apply_target_attributes(wrapfn, fndesc.argtypes, fndesc.restype)
         builder = ir.IRBuilder(wrapfn.append_basic_block('entry'))
 
         status, out = self.call_conv.call_function(
