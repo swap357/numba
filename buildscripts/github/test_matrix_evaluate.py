@@ -26,6 +26,7 @@ def test_python_tag():
     assert _python_tag("3.14") == "cp314"
     # free-threaded suffix preserved
     assert _python_tag("3.14t") == "cp314t"
+    assert _python_tag("3.15t") == "cp315t"
     # patch component stripped (with/without 't')
     assert _python_tag("3.14.3") == "cp314"
     assert _python_tag("3.14.3t") == "cp314t"
@@ -37,6 +38,7 @@ def test_canonical_version():
     assert _canonical_version("3.14") == "3.14"
     # free-threaded suffix dropped
     assert _canonical_version("3.14t") == "3.14"
+    assert _canonical_version("3.15t") == "3.15"
     # patch component dropped (with/without 't')
     assert _canonical_version("3.14.3") == "3.14"
     assert _canonical_version("3.14.3t") == "3.14"
@@ -46,10 +48,13 @@ def test_wheel_has_free_threaded():
     py_versions = {r["python_version_full"] for r in WHEEL_BUILD_MATRIX}
     # wheel matrix includes the free-threaded build
     assert "3.14t" in py_versions
+    assert "3.15t" in py_versions
     # conda matrix does not (no upstream FT conda package)
-    assert "3.14t" not in {
+    conda_versions = {
         r["python_version_full"] for r in CONDA_BUILD_MATRIX
     }
+    assert "3.14t" not in conda_versions
+    assert "3.15t" not in conda_versions
 
 
 def test_wheel_314t_fields():
@@ -60,6 +65,16 @@ def test_wheel_314t_fields():
     # python_tag and python_major_minor both keep the 't'
     assert entry["python_tag"] == "cp314t"
     assert entry["python_major_minor"] == "3.14t"
+
+
+def test_wheel_315t_fields():
+    entry = next(
+        r for r in WHEEL_BUILD_MATRIX
+        if r["python_version_full"] == "3.15t"
+    )
+    assert entry["python_tag"] == "cp315t"
+    assert entry["python_major_minor"] == "3.15t"
+    assert entry["numpy_build"] == "2.5.2"
 
 
 def test_conda_has_python_major_minor():
@@ -121,6 +136,13 @@ def test_eval_dispatch_filter_python():
     assert len(build) == 1
     assert build[0]["python_tag"] == "cp314t"
     assert build[0]["python_major_minor"] == "3.14t"
+    build, _ = evaluate(
+        "wheel", "workflow_dispatch", None,
+        "linux-64", json.dumps({"python_version": "3.15t"}),
+    )
+    assert len(build) == 1
+    assert build[0]["python_tag"] == "cp315t"
+    assert build[0]["python_major_minor"] == "3.15t"
 
 
 def test_eval_dispatch_filter_numpy():
