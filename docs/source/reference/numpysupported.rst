@@ -1128,6 +1128,8 @@ Statistics
 * :func:`numpy.average` (`axis` argument is not supported)
 * :func:`numpy.argmax` (``axis`` keyword argument supported).
 * :func:`numpy.argmin` (``axis`` keyword argument supported).
+* :func:`numpy.nanargmax` (``axis`` keyword argument supported).
+* :func:`numpy.nanargmin` (``axis`` keyword argument supported).
 * :func:`numpy.argpartition` (only the 2 first arguments)
 
 Window functions
