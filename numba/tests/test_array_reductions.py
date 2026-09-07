@@ -626,6 +626,18 @@ class TestArrayReductions(MemoryLeakMixin, TestCase):
             np.array([[1.0, np.nan, 3.0], [2.0, 5.0, np.nan]]),
             np.array([1, 3, 2]),                 # int64
             np.array([1, 3, 2], dtype=np.int32),
+            # non-contiguous and F-order input, 0-d arrays, and +/- inf,
+            # following the coverage of NumPy's own nanfunctions tests
+            np.array([1.0, 5.0, np.nan, 3.0, 7.0])[::2],
+            np.asfortranarray(np.array([[1.0, np.nan], [3.0, 4.0]])),
+            np.array(1.0),
+            np.array([np.inf, -np.inf]),
+            np.array([np.nan, np.inf]),
+            np.array([-np.inf, -np.inf]),
+            # a NaN next to an infinity equal to NumPy's NaN replacement
+            # value wins the tie-break, the replaced index is returned
+            np.array([np.nan, -np.inf]),
+            np.array([np.inf, np.nan]),
         ]
 
         for pyfunc in pyfuncs:
@@ -646,13 +658,15 @@ class TestArrayReductions(MemoryLeakMixin, TestCase):
             self.assertEqual(got.dtype, np.dtype(np.intp))
 
         # axis=None flattens, axis=k (including negative) reduces along the
-        # given axis, matching NumPy exactly
+        # given axis, matching NumPy exactly; also for F-order input.
+        # Note: a 0-d array with an explicit axis is not supported, the
+        # same as for np.argmax/np.argmin.
         arr2d = np.array([[1.0, np.nan, 3.0], [2.0, 5.0, np.nan]])
         arr4d = np.arange(120.).reshape(2, 3, 4, 5)
         arr4d[0, 1, 1, 2] = np.nan
         arr4d[1, 2, 3, 4] += 100
 
-        for arr in [arr2d, arr4d]:
+        for arr in [arr2d, np.asfortranarray(arr2d), arr4d]:
             axes = list(range(arr.ndim)) + [-(i + 1) for i in range(arr.ndim)]
             py_functions = [
                 lambda a, _axis=axis: np.nanargmax(a, axis=_axis)
@@ -700,6 +714,14 @@ class TestArrayReductions(MemoryLeakMixin, TestCase):
             with self.assertRaisesRegex(ValueError,
                                          "All-NaN slice encountered"):
                 cfunc(allnan)
+            # a 0-d NaN array is an all-NaN slice too
+            allnan_0d = np.array(np.nan)
+            with self.assertRaisesRegex(ValueError,
+                                         "All-NaN slice encountered"):
+                pyfunc(allnan_0d)
+            with self.assertRaisesRegex(ValueError,
+                                         "All-NaN slice encountered"):
+                cfunc(allnan_0d)
             # an all-NaN slice along the reduced axis also raises, the second
             # column of nan_col is all-NaN
             nan_col = np.array([[1.0, np.nan], [3.0, np.nan]])
