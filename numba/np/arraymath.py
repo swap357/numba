@@ -1275,12 +1275,14 @@ def array_argmax(a, axis=None):
     return array_argmax_impl
 
 
-def build_array_nanarg_impl(name, operator):
+def build_array_nanarg_impl(name, operator, nan_fill):
     """
-    Given an argument reduction name ('max' or 'min') and the comparison to
-    apply, return an implementation of the flattened-array logic shared by
-    np.nanargmax and np.nanargmin. NaN values are skipped, matching NumPy an
-    all-NaN or empty input raises ValueError.
+    Given an argument reduction name ('max' or 'min'), the comparison to
+    apply, and the value NaN is replaced with, return an implementation of
+    the flattened-array logic shared by np.nanargmax and np.nanargmin. Like
+    NumPy, which replaces NaN with nan_fill (+inf for min, -inf for max) and
+    then runs a plain argmin/argmax, a NaN adjacent to an infinity equal to
+    nan_fill can win the tie-break. All-NaN or empty input raises ValueError.
     """
     empty_msg = f"attempt to get arg{name} of an empty sequence"
 
@@ -1289,27 +1291,32 @@ def build_array_nanarg_impl(name, operator):
         if arry.size == 0:
             raise ValueError(empty_msg)
 
-        # max_value is initialised such that it is never used in a
-        # comparison: the first non-NaN element is taken unconditionally
-        # (max_idx < 0) and later comparisons only see stored values
-        max_idx = -1
-        max_value = 0
+        # Mimic NumPy's replace-then-argmax: NaN competes as nan_fill, so a
+        # real infinity equal to nan_fill may lose the tie-break to an
+        # earlier NaN position. `found` tracks whether any non-NaN value
+        # was seen at all.
+        max_idx = 0
+        max_value = nan_fill
+        found = False
         idx = 0
         for v in arry.flat:
-            if not np.isnan(v):
-                if max_idx < 0 or operator(v, max_value):
-                    max_value = v
-                    max_idx = idx
+            if np.isnan(v):
+                v = nan_fill
+            else:
+                found = True
+            if operator(v, max_value):
+                max_value = v
+                max_idx = idx
             idx += 1
-        if max_idx < 0:
+        if not found:
             raise ValueError("All-NaN slice encountered")
         return max_idx
 
     return array_nanarg_impl
 
 
-array_nanargmax_impl = build_array_nanarg_impl("max", operator.gt)
-array_nanargmin_impl = build_array_nanarg_impl("min", operator.lt)
+array_nanargmax_impl = build_array_nanarg_impl("max", operator.gt, -np.inf)
+array_nanargmin_impl = build_array_nanarg_impl("min", operator.lt, np.inf)
 
 
 @overload(np.nanargmin)
