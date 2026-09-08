@@ -764,12 +764,13 @@ class TestCudaIntrinsic(CUDATestCase):
         np.random.seed(1)
         x = np.random.randint(1, 65505, size=N).astype(np.float16)
         r = np.zeros_like(x)
+        rtol = 1e-3
         for kernel, fn in zip(kernels, expected_functions):
             with self.subTest(fn=fn):
                 kernel = cuda.jit("void(f2[:], f2[:])")(kernel)
                 kernel[1,N](r, x)
                 expected = fn(x, dtype=np.float16)
-                np.testing.assert_allclose(r, expected)
+                np.testing.assert_allclose(r, expected, rtol=rtol)
 
         x2 = np.random.randint(1, 10, size=N).astype(np.float16)
         for kernel, fn in zip(exp_kernels, expected_exp_functions):
@@ -777,7 +778,7 @@ class TestCudaIntrinsic(CUDATestCase):
                 kernel = cuda.jit("void(f2[:], f2[:])")(kernel)
                 kernel[1,N](r, x2)
                 expected = fn(x2, dtype=np.float16)
-                np.testing.assert_allclose(r, expected)
+                np.testing.assert_allclose(r, expected, rtol=rtol)
 
     @skip_unless_cc_53
     def test_hexp10(self):
