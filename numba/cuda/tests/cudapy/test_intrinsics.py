@@ -4,6 +4,7 @@ import operator
 import re
 from numba import cuda, int64
 from numba.cuda import compile_ptx
+from numba.core import config
 from numba.core.errors import TypingError
 from numba.core.types import f2
 from numba.cuda.testing import (unittest, CUDATestCase, skip_on_cudasim,
@@ -764,7 +765,7 @@ class TestCudaIntrinsic(CUDATestCase):
         np.random.seed(1)
         x = np.random.randint(1, 65505, size=N).astype(np.float16)
         r = np.zeros_like(x)
-        rtol = 1e-3
+        rtol = 1e-3 if config.ENABLE_CUDASIM else 1e-7
         for kernel, fn in zip(kernels, expected_functions):
             with self.subTest(fn=fn):
                 kernel = cuda.jit("void(f2[:], f2[:])")(kernel)
