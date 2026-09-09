@@ -278,6 +278,7 @@ Pull-Requests:
 * PR `#10809 <https://github.com/numba/numba/pull/10809>`_: CI: use `--pre` for llvmlite installs on wheel builder workflows (`swap357 <https://github.com/swap357>`_)
 * PR `#10822 <https://github.com/numba/numba/pull/10822>`_: relax CUDASIM test fp16 intrinsic comparison tolerance. (`swap357 <https://github.com/swap357>`_)
 * PR `#10825 <https://github.com/numba/numba/pull/10825>`_: update version support table for 0.68.0rc1 (`swap357 <https://github.com/swap357>`_)
+* PR `#10826 <https://github.com/numba/numba/pull/10826>`_: Changelog `0.68` (`swap357 <https://github.com/swap357>`_)
 
 Authors:
 
