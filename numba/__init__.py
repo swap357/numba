@@ -22,7 +22,7 @@ def _ensure_critical_deps():
     #NOTE THIS CODE SHOULD NOT IMPORT ANYTHING FROM NUMBA!
 
     def extract_version(mod):
-        return tuple(map(int, mod.__version__.split('.')[:3]))
+        return tuple(map(int, mod.__version__.split('.')[:2]))
 
     PYVERSION = sys.version_info[:2]
 
@@ -34,12 +34,12 @@ def _ensure_critical_deps():
     import numpy as np
     numpy_version = extract_version(np)
 
-    if numpy_version < (1, 22, 3):
-        msg = (f"Numba needs NumPy 1.22.3 or greater. Got NumPy "
+    if numpy_version < (1, 22):
+        msg = (f"Numba needs NumPy 1.22 or greater. Got NumPy "
                f"{numpy_version[0]}.{numpy_version[1]}.")
         raise ImportError(msg)
 
-    if numpy_version[:2] > (2, 5):
+    if numpy_version > (2, 5):
         msg = (f"Numba needs NumPy 2.5 or less. Got NumPy "
                f"{numpy_version[0]}.{numpy_version[1]}.")
         raise ImportError(msg)
