@@ -1,7 +1,7 @@
 Enable ahead-of-time compilation of ILP64 linear algebra.
 ---------------------------------------------------------
 
-Ahead-of-time compilated modules use the same LAPACK ABI as the JIT-compiled modules.
-In other words, if Numba was built with the ``NUMBA_LAPACK_ILP64=1`` environment
-variable, both JIT and AOT compilation uses the ILP64 LAPACK ABI.
+The LAPACK ABI with which Numba was built is now used by Numba produced ahead-of-time
+compiled modules. i.e. if Numba was built with the ILP64 LAPACK ABI then Numba emits AOT
+compiled modules with that ABI.
 
