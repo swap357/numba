@@ -22,8 +22,9 @@ except ImportError:
 min_python_version = "3.10"
 max_python_version = "3.16"  # exclusive
 min_numpy_build_version = "2.0.0rc1"
-min_numpy_run_version = "1.22"
+min_numpy_run_version = "1.22.3"
 max_numpy_run_version = "2.6"
+max_numpy_build_version = max_numpy_run_version
 min_llvmlite_version = "0.50.0dev0"
 max_llvmlite_version = "0.51"
 
@@ -413,7 +414,7 @@ def get_ext_modules():
 packages = find_packages(include=["numba", "numba.*"])
 
 build_requires = ['numpy >={},<{}'.format(min_numpy_build_version,
-                                          max_numpy_run_version)]
+                                          max_numpy_build_version)]
 install_requires = [
     'llvmlite >={},<{}'.format(min_llvmlite_version, max_llvmlite_version),
     'numpy >={},<{}'.format(min_numpy_run_version, max_numpy_run_version),
