@@ -60,6 +60,15 @@ make sure that SciPy available at run time exports the ILP64 ``cython_lapack`` A
 
 (`PR-#10784 <https://github.com/numba/numba/pull/10784>`__)
 
+Enable ahead-of-time compilation of ILP64 linear algebra.
+---------------------------------------------------------
+
+The LAPACK ABI with which Numba was built is now used by Numba produced ahead-of-time
+compiled modules. i.e. if Numba was built with the ILP64 LAPACK ABI then Numba emits AOT
+compiled modules with that ABI.
+
+(`PR-#10818 <https://github.com/numba/numba/pull/10818>`__)
+
 
 NumPy Support
 ~~~~~~~~~~~~~
@@ -276,12 +285,14 @@ Pull-Requests:
 * PR `#10805 <https://github.com/numba/numba/pull/10805>`_: update win-arm64 versions (`betterqualityassuranceuser <https://github.com/betterqualityassuranceuser>`_ `esc <https://github.com/esc>`_ `swap357 <https://github.com/swap357>`_)
 * PR `#10808 <https://github.com/numba/numba/pull/10808>`_: ENH: add support for np.nanargmax and np.nanargmin (`juanmicl <https://github.com/juanmicl>`_)
 * PR `#10809 <https://github.com/numba/numba/pull/10809>`_: CI: use `--pre` for llvmlite installs on wheel builder workflows (`swap357 <https://github.com/swap357>`_)
+* PR `#10818 <https://github.com/numba/numba/pull/10818>`_: ILP64 follow-ups: AOT compile + small cleanups (`ArvidJB <https://github.com/ArvidJB>`_ `ev-br <https://github.com/ev-br>`_ `stuartarchibald <https://github.com/stuartarchibald>`_)
 * PR `#10822 <https://github.com/numba/numba/pull/10822>`_: relax CUDASIM test fp16 intrinsic comparison tolerance. (`swap357 <https://github.com/swap357>`_)
 * PR `#10825 <https://github.com/numba/numba/pull/10825>`_: update version support table for 0.68.0rc1 (`swap357 <https://github.com/swap357>`_)
 * PR `#10826 <https://github.com/numba/numba/pull/10826>`_: Changelog `0.68` (`swap357 <https://github.com/swap357>`_)
 
 Authors:
 
+* `ArvidJB <https://github.com/ArvidJB>`_
 * `benjeffery <https://github.com/benjeffery>`_
 * `betterqualityassuranceuser <https://github.com/betterqualityassuranceuser>`_
 * `coderay3000 <https://github.com/coderay3000>`_
@@ -302,6 +313,7 @@ Authors:
 * `renovate[bot] <https://github.com/apps/renovate>`_
 * `ricardoV94 <https://github.com/ricardoV94>`_
 * `sklam <https://github.com/sklam>`_
+* `stuartarchibald <https://github.com/stuartarchibald>`_
 * `swap357 <https://github.com/swap357>`_
 * `velochy <https://github.com/velochy>`_
 * `zain-asif-dev <https://github.com/zain-asif-dev>`_
