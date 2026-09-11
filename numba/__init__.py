@@ -32,11 +32,12 @@ def _ensure_critical_deps():
         raise ImportError(msg)
 
     import numpy as np
-    numpy_version = extract_version(np)
+    from numpy.lib import NumpyVersion
+    numpy_version = NumpyVersion(np.__version__)
 
-    if numpy_version < (1, 22):
-        msg = (f"Numba needs NumPy 1.22 or greater. Got NumPy "
-               f"{numpy_version[0]}.{numpy_version[1]}.")
+    if numpy_version < '1.22.3':
+        msg = (f"Numba needs NumPy 1.22.3 or greater. Got NumPy "
+               f"{numpy_version.major}.{numpy_version.minor}.")
         raise ImportError(msg)
 
     try:
