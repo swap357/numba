@@ -1,0 +1,11 @@
+name: nb-pipeline-viz
+channels:
+  - defaults
+dependencies:
+  - python>=3.10
+  - numba
+  - numpy
+  - pip
+  - pip:
+      - fastapi
+      - uvicorn

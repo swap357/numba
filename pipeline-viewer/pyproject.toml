@@ -1,0 +1,23 @@
+[project]
+name = "nb-pipeline-viz"
+version = "0.1.0"
+description = ""
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "numba",
+    "numpy",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[project.scripts]
+pipeline-viewer = "app:main"
+
+[tool.pytest.ini_options]
+testpaths = ["."]
+python_files = ["test_*.py"]
