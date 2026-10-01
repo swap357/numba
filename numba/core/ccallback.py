@@ -57,7 +57,10 @@ class CFunc(object):
         self._cache_hits = 0
 
     def enable_caching(self):
-        self._cache = FunctionCache(self._pyfunc)
+        self._cache = FunctionCache(
+            self._pyfunc,
+            enable_vector_lib=self._compiler.targetoptions.get(
+                'enable_vector_lib'))
 
     @global_compiler_lock
     def compile(self):

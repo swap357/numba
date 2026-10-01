@@ -215,6 +215,7 @@ class BaseContext(object):
 
     # Fast math flags
     fastmath = False
+    enable_vector_lib = None
 
     # python execution environment
     environment = None
