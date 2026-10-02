@@ -6,7 +6,6 @@ The export requirements must be reviewed when LLVM's mappings change.
 import ctypes
 from ctypes.util import find_library
 import functools
-import os
 import platform
 import sys
 
@@ -60,23 +59,14 @@ def _load(provider, path):
         ) from exc
 
 
-def resolve(requested='auto', path=None):
+def resolve(requested='auto'):
     """Load a compatible runtime and return ``(provider, runtime_path)``."""
     choices = ('auto', 'none', *_LIBRARIES)
     if not isinstance(requested, str) or requested not in choices:
         raise ValueError(
-            f"Invalid NUMBA_VECTOR_LIB value {requested!r}; "
+            f"Invalid NUMBA_VECTOR_MATH_LIBRARY value {requested!r}; "
             f"expected one of {choices}"
         )
-    if path is not None:
-        if requested in ('auto', 'none'):
-            raise ValueError(
-                "NUMBA_VECTOR_LIB_PATH requires an explicit vector library"
-            )
-        path = os.fsdecode(os.fspath(path))
-        if not path or '\0' in path:
-            raise ValueError("NUMBA_VECTOR_LIB_PATH must be a nonempty path")
-        path = os.path.abspath(path)
     if requested == 'none':
         return ('none', None)
     candidates = _candidates()
@@ -96,7 +86,7 @@ def resolve(requested='auto', path=None):
         name = _LIBRARIES[provider]
         if provider == 'svml' and sys.platform == 'win32':
             name = 'svml_dispmd'
-        runtime = path or find_library(name)
+        runtime = find_library(name)
         if runtime is None:
             if requested == 'auto':
                 continue

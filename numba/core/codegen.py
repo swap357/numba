@@ -1383,7 +1383,7 @@ class JITCPUCodegen(CPUCodegen):
         requested = config.VECTOR_LIB
         self._vector_library_default = None if requested is None else 'none'
         self._vector_library = resolve(
-            'auto' if requested is None else requested, config.VECTOR_LIB_PATH)
+            'none' if requested is None else requested)
         super()._init(llvm_module)
 
     def _customize_tm_options(self, options):
