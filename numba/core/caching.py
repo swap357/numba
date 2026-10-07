@@ -817,6 +817,13 @@ class FunctionCache(Cache):
     """
     _impl_class = CompileResultCacheImpl
 
+    def __init__(self, py_func, *, enable_vector_lib=None):
+        super().__init__(py_func)
+        self._enable_vector_lib = enable_vector_lib
+
+    def _index_key(self, sig, codegen):
+        return super()._index_key(sig, codegen) + (self._enable_vector_lib,)
+
 
 # Remember used cache filename prefixes.
 _lib_cache_prefixes = set([''])
