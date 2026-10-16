@@ -649,6 +649,7 @@ class CPUCodeLibrary(CodeLibrary):
             str(self._codegen._create_empty_module(self.name)))
         self._final_module.name = cgutils.normalize_ir_text(self.name)
         self._shared_module = None
+        self._vector_library = codegen._vector_library_default
 
     def _optimize_functions(self, ll_module):
         """
@@ -659,7 +660,8 @@ class CPUCodeLibrary(CodeLibrary):
         for func in ll_module.functions:
             # Run function-level optimizations to reduce memory usage and improve
             # module-level optimization.
-            fpm, pb = self._codegen._function_pass_manager()
+            fpm, pb = self._codegen._function_pass_manager(
+                vector_library=self._vector_library)
             k = f"Function passes on {func.name!r}"
             with self._recorded_timings.record(k, pb):
                 fpm.run(func, pb)
@@ -674,9 +676,11 @@ class CPUCodeLibrary(CodeLibrary):
                                            loop_vectorize=self._codegen._loopvect,
                                            slp_vectorize=False,
                                            opt=self._codegen._opt_level,
-                                           cost="cheap")
+                                           cost="cheap",
+                                           vector_library=self._vector_library)
 
-        mpm_full, mpb_full = self._codegen._module_pass_manager()
+        mpm_full, mpb_full = self._codegen._module_pass_manager(
+            vector_library=self._vector_library)
         cheap_name = "Module passes (cheap optimization for refprune)"
         with self._recorded_timings.record(cheap_name, mpb_cheap):
             # A cheaper optimisation pass is run first to try and get as many
@@ -1171,6 +1175,9 @@ class Codegen(metaclass=ABCMeta):
 
 class CPUCodegen(Codegen):
 
+    _vector_library = ('none', None)
+    _vector_library_default = None
+
     def __init__(self, module_name):
         initialize_llvm()
 
@@ -1183,6 +1190,8 @@ class CPUCodegen(Codegen):
 
     def _init(self, llvm_module):
         assert list(llvm_module.global_variables) == [], "Module isn't empty"
+        self._legacy_svml = (config.USING_SVML and
+                             self._vector_library_default is None)
 
         target = ll.Target.from_triple(ll.get_process_triple())
         tm_options = dict(opt=config.OPT)
@@ -1300,7 +1309,8 @@ class CPUCodegen(Codegen):
         Return a tuple unambiguously describing the codegen behaviour.
         """
         return (self._llvm_module.triple, self._get_host_cpu_name(),
-                self._tm_features)
+                self._tm_features, self._vector_library, self._legacy_svml,
+                self._vector_library_default)
 
     def _scan_and_fix_unresolved_refs(self, module):
         self._rtlinker.scan_unresolved_symbols(module, self._engine)
@@ -1367,6 +1377,14 @@ class JITCPUCodegen(CPUCodegen):
     """
 
     _library_class = JITCodeLibrary
+
+    def _init(self, llvm_module):
+        from numba.core.vector_library import resolve
+        requested = config.VECTOR_LIB
+        self._vector_library_default = None if requested is None else 'none'
+        self._vector_library = resolve(
+            'none' if requested is None else requested)
+        super()._init(llvm_module)
 
     def _customize_tm_options(self, options):
         # As long as we don't want to ship the code to another machine,
