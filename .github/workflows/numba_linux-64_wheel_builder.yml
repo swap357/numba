@@ -212,4 +212,4 @@ jobs:
           $PYTHON_PATH -m numba -s
 
           # run tests under catchsegv to obtain native backtraces on segfault
-          catchsegv $PYTHON_PATH -m numba.runtests -m 4 -v
+          NUMBA_THREADING_LAYER=tbb catchsegv $PYTHON_PATH -m numba.runtests -m 4 numba.tests.test_parallel_backend -v
