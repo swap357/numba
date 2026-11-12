@@ -129,6 +129,11 @@ detail""",
         default=cpu.FastMathOptions(False),
         doc="TODO",
     )
+    enable_vector_lib = Option(
+        type=bool,
+        default=None,
+        doc="Use the code generator's selected vector math library",
+    )
     noalias = Option(
         type=bool,
         default=False,
@@ -377,6 +382,7 @@ def _make_subtarget(targetctx, flags):
         subtargetoptions['auto_parallel'] = flags.auto_parallel
     if flags.fastmath:
         subtargetoptions['fastmath'] = flags.fastmath
+    subtargetoptions['enable_vector_lib'] = flags.enable_vector_lib
     error_model = callconv.create_error_model(flags.error_model, targetctx)
     subtargetoptions['error_model'] = error_model
 

@@ -212,6 +212,10 @@ class CPUContext(BaseContext):
         return dictobject.build_map(self, builder, dict_type, item_types, items)
 
     def post_lowering(self, mod, library):
+        if self.enable_vector_lib is not None:
+            library._vector_library = (
+                library.codegen._vector_library[0]
+                if self.enable_vector_lib else 'none')
         if self.fastmath:
             fastmathpass.rewrite_module(mod, self.fastmath)
 
@@ -323,6 +327,7 @@ _options_mixin = include_default_options(
     "no_cfunc_wrapper",
     "parallel",
     "fastmath",
+    "enable_vector_lib",
     "error_model",
     "inline",
     "forceinline",
@@ -333,6 +338,9 @@ _options_mixin = include_default_options(
 
 class CPUTargetOptions(_options_mixin, TargetOptions):
     def finalize(self, flags, options):
+        if ('enable_vector_lib' in options and
+                type(options['enable_vector_lib']) is not bool):
+            raise ValueError("enable_vector_lib must be a bool")
         if not flags.is_set("enable_pyobject"):
             flags.enable_pyobject = True
 

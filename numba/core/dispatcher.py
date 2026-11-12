@@ -43,6 +43,9 @@ class OmittedArg(object):
 class _FunctionCompiler(object):
     def __init__(self, py_func, targetdescr, targetoptions, locals,
                  pipeline_class):
+        if ('enable_vector_lib' in targetoptions and
+                type(targetoptions['enable_vector_lib']) is not bool):
+            raise ValueError("enable_vector_lib must be a bool")
         self.py_func = py_func
         self.targetdescr = targetdescr
         self.targetoptions = targetoptions
@@ -819,7 +822,9 @@ class Dispatcher(serialize.ReduceMixin, _MemoMixin, _DispatcherBase):
         return types.Dispatcher(self)
 
     def enable_caching(self):
-        self._cache = FunctionCache(self.py_func)
+        self._cache = FunctionCache(
+            self.py_func,
+            enable_vector_lib=self.targetoptions.get('enable_vector_lib'))
 
     def __get__(self, obj, objtype=None):
         '''Allow a JIT function to be bound as a method to an object'''
