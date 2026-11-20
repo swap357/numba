@@ -106,9 +106,6 @@ jobs:
   report:
     needs: [prepare, bench]
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
     env:
       PR: ${{ needs.prepare.outputs.pr }}
       HEAD_SHA: ${{ needs.prepare.outputs.head_sha }}
@@ -138,36 +135,14 @@ jobs:
       - name: Merge results
         run: python benchmark/src/bench.py merge artifacts --out pr-results/
 
-      - name: Render comment
+      - name: Render summary
         run: |
-          python .github/scripts/pr_benchmark_comment.py \
+          python .github/scripts/pr_benchmark_summary.py \
             --results pr-results \
             --head "$HEAD_SHA" \
             --base "$MAIN_SHA" \
             --pr "$PR" \
             --head-repo "$HEAD_REPO" \
             --run-url "$RUN_URL" \
-            --out comment.md
-          cat comment.md >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Comment on pull request
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          PR: ${{ needs.prepare.outputs.pr }}
-        with:
-          script: |
-            const fs = require('fs')
-            const body = fs.readFileSync('comment.md', 'utf8')
-            const { owner, repo } = context.repo
-            const issue_number = Number(process.env.PR)
-            const marker = '<!-- numba-pr-benchmark -->'
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner,
-              repo,
-              issue_number,
-            })
-            const existing = comments.find(comment => comment.body.includes(marker))
-            const { data } = existing
-              ? await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body })
-              : await github.rest.issues.createComment({ owner, repo, issue_number, body })
-            core.info(`Updated ${data.html_url}`)
+            --out summary.md
+          cat summary.md >> "$GITHUB_STEP_SUMMARY"
