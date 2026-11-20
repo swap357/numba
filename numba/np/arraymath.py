@@ -2243,8 +2243,15 @@ def _median_inner(temp_arry, n):
 
 @overload(np.median)
 def np_median(a):
-    if not isinstance(a, types.Array):
-        return
+    if isinstance(a, (types.Integer, types.Boolean, types.Float,
+                      types.Complex, types.NPTimedelta)):
+        return array_mean(a)
+    elif isinstance(a, types.NPDatetime):
+        raise TypingError(
+            "np.median() does not support datetime64 input, matching NumPy"
+        )
+    elif not isinstance(a, types.Array):
+        return None
 
     is_datetime = as_dtype(a.dtype).char in 'mM'
 
@@ -2504,8 +2511,8 @@ def valid_kths(a, kth):
     Returns a sorted, unique array of kth values which serve
     as indexers for partitioning the input array, a.
 
-    If the absolute value of any of the provided values
-    is greater than a.shape[-1] an exception is raised since
+    If any of the provided values is outside the range
+    [-a.shape[-1], a.shape[-1]) an exception is raised since
     we are partitioning along the last axis (per Numpy default
     behaviour).
 
@@ -2519,7 +2526,8 @@ def valid_kths(a, kth):
         raise ValueError('kth must be scalar or 1-D')
         # numpy raises ValueError: object too deep for desired array
 
-    if np.any(np.abs(kth_array) >= a.shape[-1]):
+    n = a.shape[-1]
+    if np.any((kth_array < -n) | (kth_array >= n)):
         raise ValueError("kth out of bounds")
 
     out = np.empty_like(kth_array)

@@ -20,8 +20,11 @@ concurrency:
 
 env:
   CONDA_CHANNEL_LLVMLITE: numba/label/dev
-  WIN_ARM64_CONDA_CHANNEL: bootstrap-win-arm64-round-2-native
   NUMPY_VERSION: "2.3"
+
+permissions:
+  contents: read
+  actions: read  # required to download llvmlite artifacts from another workflow run
 
 jobs:
   win-arm64-build-conda:
@@ -43,24 +46,19 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Set up conda-standalone
-        uses: conda-incubator/setup-conda-standalone@00a34805e93a8b640aee5f8a20e8f481ad77e3b4 # v0.1.0
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@be893c923ea9cf1cf7cd510fbdde27c7e18cbdcb # v4.1.0
         with:
-          channel: ${{ env.WIN_ARM64_CONDA_CHANNEL }}
-          conda-standalone-version: 26.3.2.post1
-          destination-directory: ${{ runner.temp }}/conda-standalone
+          architecture: arm64
+          installation-dir: C:\Miniconda
+          auto-update-conda: true
+          auto-activate-base: true
+          activate-environment: ""
 
       - name: Install conda-build
-        run: |
-          export CONDA_PREFIX="${RUNNER_TEMP}/conda-base"
-          "${CONDA_EXE}" create --prefix "${CONDA_PREFIX}" \
-            -c main \
-            --yes conda-build
-          echo "CONDA_PREFIX=${CONDA_PREFIX}" >> "${GITHUB_ENV}"
-          echo "${CONDA_PREFIX}" >> "${GITHUB_PATH}"
-          echo "${CONDA_PREFIX}/Scripts" >> "${GITHUB_PATH}"
-          echo "${CONDA_PREFIX}/Library/bin" >> "${GITHUB_PATH}"
+        run: conda install conda-build
 
       - name: Download llvmlite Artifact
         if: ${{ inputs.llvmlite_run_id != '' }}
@@ -73,16 +71,18 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Numba conda package
+        env:
+          INPUTS_LLVMLITE_RUN_ID: ${{ inputs.llvmlite_run_id }}
         run: |
           CONDA_CHANNEL_DIR="conda_channel_dir"
           mkdir -p $CONDA_CHANNEL_DIR
 
-          if [ "${{ inputs.llvmlite_run_id }}" != "" ]; then
-            LLVMLITE_CHANNEL="${{ github.workspace }}/llvmlite_conda"
+          if [ "${INPUTS_LLVMLITE_RUN_ID}" != "" ]; then
+            LLVMLITE_CHANNEL="${GITHUB_WORKSPACE}/llvmlite_conda"
           elif [ -d ci_artifacts/llvmlite_channel/win-arm64 ]; then
-            LLVMLITE_CHANNEL="${{ github.workspace }}/ci_artifacts/llvmlite_channel"
+            LLVMLITE_CHANNEL="${GITHUB_WORKSPACE}/ci_artifacts/llvmlite_channel"
           else
-            LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_LLVMLITE }}"
+            LLVMLITE_CHANNEL="${CONDA_CHANNEL_LLVMLITE}"
           fi
 
           if [ -n "${EXTRA_CHANNELS}" ]; then
@@ -130,24 +130,19 @@ jobs:
           # sparse checkout so the numba source tree cannot shadow the
           # installed package during tests
           sparse-checkout: ci_artifacts
+          persist-credentials: false
 
-      - name: Set up conda-standalone
-        uses: conda-incubator/setup-conda-standalone@00a34805e93a8b640aee5f8a20e8f481ad77e3b4 # v0.1.0
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@be893c923ea9cf1cf7cd510fbdde27c7e18cbdcb # v4.1.0
         with:
-          channel: ${{ env.WIN_ARM64_CONDA_CHANNEL }}
-          conda-standalone-version: 26.3.2.post1
-          destination-directory: ${{ runner.temp }}/conda-standalone
+          architecture: arm64
+          installation-dir: C:\Miniconda
+          auto-update-conda: true
+          auto-activate-base: true
+          activate-environment: ""
 
       - name: Install conda-build
-        run: |
-          export CONDA_PREFIX="${RUNNER_TEMP}/conda-base"
-          "${CONDA_EXE}" create --prefix "${CONDA_PREFIX}" \
-            -c main \
-            --yes conda-build
-          echo "CONDA_PREFIX=${CONDA_PREFIX}" >> "${GITHUB_ENV}"
-          echo "${CONDA_PREFIX}" >> "${GITHUB_PATH}"
-          echo "${CONDA_PREFIX}/Scripts" >> "${GITHUB_PATH}"
-          echo "${CONDA_PREFIX}/Library/bin" >> "${GITHUB_PATH}"
+        run: conda install conda-build
 
       - name: Download llvmlite artifact
         if: ${{ inputs.llvmlite_run_id != '' }}
@@ -168,13 +163,14 @@ jobs:
         env:
           TESTS_TO_RUN: "numba.tests"
           NUMBA_ENABLE_CUDASIM: 1
+          INPUTS_LLVMLITE_RUN_ID: ${{ inputs.llvmlite_run_id }}
         run: |
-          if [ "${{ inputs.llvmlite_run_id }}" != "" ]; then
-            LLVMLITE_CHANNEL="${{ github.workspace }}/llvmlite_conda"
+          if [ "${INPUTS_LLVMLITE_RUN_ID}" != "" ]; then
+            LLVMLITE_CHANNEL="${GITHUB_WORKSPACE}/llvmlite_conda"
           elif [ -d ci_artifacts/llvmlite_channel/win-arm64 ]; then
-            LLVMLITE_CHANNEL="${{ github.workspace }}/ci_artifacts/llvmlite_channel"
+            LLVMLITE_CHANNEL="${GITHUB_WORKSPACE}/ci_artifacts/llvmlite_channel"
           else
-            LLVMLITE_CHANNEL="${{ env.CONDA_CHANNEL_LLVMLITE }}"
+            LLVMLITE_CHANNEL="${CONDA_CHANNEL_LLVMLITE}"
           fi
 
           if [ -n "${EXTRA_CHANNELS}" ]; then

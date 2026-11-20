@@ -465,9 +465,12 @@ class CacheImpl(metaclass=ABCMeta):
         # '<' and '>' can appear in the qualname (e.g. '<locals>') but
         # are forbidden in Windows filenames
         fixed_fullname = fullname.replace('<', '').replace('>', '')
-        fmt = '%s-%s.py%d%d%s'
+        # The numba version is included so that caches produced by different
+        # numba versions can coexist side by side
+        fmt = '%s-%s.py%d%d%s.numba%s'
         return fmt % (fixed_fullname, self.locator.get_disambiguator(),
-                      sys.version_info[0], sys.version_info[1], abiflags)
+                      sys.version_info[0], sys.version_info[1], abiflags,
+                      numba.__version__)
 
     @property
     def filename_base(self):
@@ -710,17 +713,19 @@ class Cache(_Cache):
     A per-function compilation cache.  The cache saves data in separate
     data files and maintains information in an index file.
 
-    There is one index file per function and Python version
-    ("function_name-<lineno>.pyXY.nbi") which contains a mapping of
+    There is one index file per function, Python version and Numba version
+    ("function_name-<lineno>.pyXY.numbaV.nbi") which contains a mapping of
     signatures and architectures to data files.
     It is prefixed by a versioning key and a timestamp of the Python source
     file containing the function.
 
-    There is one data file ("function_name-<lineno>.pyXY.<number>.nbc")
-    per function, function signature, target architecture and Python version.
+    There is one data file ("function_name-<lineno>.pyXY.numbaV.<number>.nbc")
+    per function, function signature, target architecture, Python version and
+    Numba version.
 
     Separate index and data files per Python version avoid pickle
-    compatibility problems.
+    compatibility problems. Separate files per Numba version allow caches
+    produced by different Numba versions to coexist.
 
     Note:
     This contains the driver logic only.  The core logic is provided
@@ -861,6 +866,13 @@ def make_library_cache(prefix):
         feature for the specified python function.
         """
         _impl_class = CustomCodeLibraryCacheImpl
+
+        def __init__(self, py_func, kernel_symbol):
+            super().__init__(py_func)
+            self._kernel_symbol = kernel_symbol
+
+        def _index_key(self, sig, codegen):
+            return super()._index_key(sig, codegen) + (self._kernel_symbol,)
 
     return LibraryCache
 
