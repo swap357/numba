@@ -1,0 +1,192 @@
+name: Build wheels
+
+on:
+  push:
+    branches:
+    - main
+    tags:
+    - v*
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  WHEELS_INDEX_URL: https://pypi.anaconda.org/numba/label/dev/simple
+
+jobs:
+  load-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      build-matrix-json: ${{ steps.load_matrix_json.outputs.build-matrix-json }}
+      test-matrix-json: ${{ steps.load_matrix_json.outputs.test-matrix-json }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: load_matrix_json
+        name: Load Workflow Matrix JSON
+        run: |
+          BUILD_MATRIX_JSON=$(jq -c .wheel_build_matrix .github/workflows/wheel_workflow_matrix.json)
+          TEST_MATRIX_JSON=$(jq -c '.wheel_test_matrix | map(. + {"python_tag": ("cp" + (."python-version" | split(".") | join("")))})' .github/workflows/wheel_workflow_matrix.json)
+          echo "build-matrix-json=$BUILD_MATRIX_JSON" >> $GITHUB_OUTPUT
+          echo "test-matrix-json=$TEST_MATRIX_JSON" >> $GITHUB_OUTPUT
+
+  build_wheels:
+    name: build ${{ matrix.os }} (py ${{ matrix.build['python-version'] }}, np ${{ matrix.build.numpy_build }})
+    needs: load-matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, ubuntu-22.04-arm]
+        build: ${{ fromJson(needs.load-matrix.outputs.build-matrix-json) }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v3.2.0
+        env:
+          # Keep most settings in pyproject.toml; minimally wire in build+test here.
+          CIBW_SKIP: "pp* *-musllinux_*"
+          CIBW_PRERELEASE_PYTHONS: "1"
+          CIBW_ARCHS_LINUX: "auto"
+          CIBW_ARCHS_MACOS: "auto"
+          CIBW_CONTAINER_ENGINE: "docker"
+          CIBW_BUILD_VERBOSITY: "1"
+          CIBW_BUILD: "${{ matrix.build.python_tag }}-*"
+
+          # Build prerequisites (Numba requires llvmlite present at build time)
+          CIBW_BEFORE_BUILD: |
+            set -eux
+            python -m pip install -U pip setuptools wheel
+            python -m pip install numpy==${{ matrix.build.numpy_build }}
+            if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
+              python -m pip install tbb==2021.6 tbb-devel==2021.6
+              export TBBROOT=$(python -c "import sysconfig; p=sysconfig.get_paths(); print(p.get('data') or p.get('platlib') or p.get('purelib'))")
+              find /opt /usr -name "libtbb.so*" -exec cp {} /usr/local/lib/ \; 2>/dev/null
+              ldconfig
+            fi
+            python -m pip install -i https://pypi.anaconda.org/numba/label/dev/simple llvmlite
+
+          # Make the dev index available for dependency resolution during tests
+          CIBW_ENVIRONMENT: "PIP_EXTRA_INDEX_URL=https://pypi.anaconda.org/numba/label/dev/simple"
+
+          # Align with existing macOS wheel target and include dev index
+          CIBW_ENVIRONMENT_MACOS: "MACOSX_DEPLOYMENT_TARGET=11.1 PIP_EXTRA_INDEX_URL=https://pypi.anaconda.org/numba/label/dev/simple"
+
+          # On linux-64 only, provide TBBROOT pointing at the CPython prefix used by cibuildwheel
+          CIBW_ENVIRONMENT_LINUX: ${{ matrix.os == 'ubuntu-latest' && format('PIP_EXTRA_INDEX_URL=https://pypi.anaconda.org/numba/label/dev/simple TBBROOT=/opt/python/{0}-{0}', matrix.build.python_tag) || 'PIP_EXTRA_INDEX_URL=https://pypi.anaconda.org/numba/label/dev/simple' }}
+
+          # Linux repair: do not vendor libs; remove numba.libs and patch SONAMEs
+          CIBW_REPAIR_WHEEL_COMMAND_LINUX: |
+            set -eux
+            WORK=$(mktemp -d)
+            cp {wheel} "$WORK/"
+            cd "$WORK"
+            python -m pip install -U wheel auditwheel patchelf
+            python -m auditwheel repair "$(basename {wheel})" -w "$WORK/wheelhouse"
+            cd "$WORK/wheelhouse"
+            WHL=$(ls -1 *.whl | head -1)
+            python -m wheel unpack "$WHL"
+            DIR=$(find . -maxdepth 1 -type d -name "numba-*" | head -1)
+            cd "$DIR"
+            if [ -d "numba.libs" ]; then
+              cd numba.libs
+              LIBTBB=$(ls libtbb* 2>/dev/null || true)
+              LIBGOMP=$(ls libgomp* 2>/dev/null || true)
+              cd ..
+              rm -rf numba.libs
+              if ls numba/np/ufunc/tbbpool*.so >/dev/null 2>&1; then
+                if [ -n "$LIBTBB" ]; then
+                  patchelf numba/np/ufunc/tbbpool*.so --replace-needed "$LIBTBB" libtbb.so.12 || true
+                  patchelf numba/np/ufunc/tbbpool*.so --remove-rpath || true
+                fi
+              fi
+              if ls numba/np/ufunc/omppool*.so >/dev/null 2>&1; then
+                if [ -n "$LIBGOMP" ]; then
+                  patchelf numba/np/ufunc/omppool*.so --replace-needed "$LIBGOMP" libgomp.so.1 || true
+                  patchelf numba/np/ufunc/omppool*.so --remove-rpath || true
+                fi
+              fi
+            fi
+            cd ..
+            rm -f *.whl
+            python -m wheel pack "$DIR"
+            mv *.whl {dest_dir}/
+
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.build.python_tag }}
+          path: ./wheelhouse/*.whl
+          compression-level: 0
+          if-no-files-found: error
+
+  test_wheels:
+    name: test ${{ matrix.os }} (py ${{ matrix.test.python-version }}, np ${{ matrix.test.numpy_test }})
+    needs: [load-matrix, build_wheels]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, ubuntu-22.04-arm]
+        test: ${{ fromJson(needs.load-matrix.outputs.test-matrix-json) }}
+
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.test['python-version'] }}
+          allow-prereleases: true
+
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.test.python_tag }}
+          path: dist
+
+      - name: Prepare macOS OpenMP
+        if: runner.os == 'macOS'
+        run: |
+          brew update || true
+          brew install libomp || true
+
+      - name: Install and test wheel
+        env:
+          PIP_EXTRA_INDEX_URL: https://pypi.anaconda.org/numba/label/dev/simple
+        run: |
+          PY=$(python -c 'import sys; print(sys.executable)')
+          $PY -m pip install -U pip
+          $PY -m pip install numpy==${{ matrix.test.numpy_test }} pytest
+          $PY -m pip install dist/*.whl
+          if [ "${{ runner.os }}" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
+            $PY -m pip install tbb
+            NUMBA_THREADING_LAYER=tbb $PY -c "import numba; numba.get_num_threads(); print(numba.threading_layer())"
+          fi
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            export DYLD_FALLBACK_LIBRARY_PATH=$(brew --prefix libomp)/lib
+          fi
+          $PY -m numba -s
+
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Build sdist
+        run: pipx run build --sdist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cibw-sdist
+          path: dist/*.tar.gz
+          compression-level: 0
+          if-no-files-found: error
