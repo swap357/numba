@@ -646,7 +646,7 @@ def array_sum(a, axis=None, dtype=None):
             def array_sum_impl(a, axis=None, dtype=None):
                 check_axis_bounds(a, axis)
                 check_duplicates(axis, a.ndim)
-                return _numpy_sum(a, axis, dtype)
+                return _numpy_sum(a.copy(), axis, dtype)
         else:
             def array_sum_impl(a, axis=None, dtype=None):
                 check_axis_bounds(a, axis)
